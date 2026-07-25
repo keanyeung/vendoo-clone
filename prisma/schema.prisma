@@ -1,0 +1,58 @@
+// Prisma schema for the vendoo-clone reselling app.
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum ItemStatus {
+  DRAFT
+  LISTED
+  SOLD
+}
+
+enum Platform {
+  FB_MARKETPLACE
+  DEPOP
+  EBAY
+}
+
+model Item {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Cloud object-storage URLs for the item's photos.
+  photos String[]
+
+  // Listing content (AI-drafted, user-editable).
+  title       String
+  description String  @db.Text
+  brand       String?
+  category    String?
+  size        String?
+  color       String?
+  condition   String?
+
+  // Pricing.
+  suggestedPrice Decimal? @db.Decimal(10, 2) // AI estimate
+  listPrice      Decimal  @db.Decimal(10, 2) // what you actually listed at
+  purchasePrice  Decimal  @db.Decimal(10, 2) // what you paid
+
+  status ItemStatus @default(LISTED)
+
+  // Sale details (populated when the item sells).
+  soldPrice    Decimal?  @db.Decimal(10, 2)
+  soldPlatform Platform?
+  soldDate     DateTime?
+  platformFees Decimal?  @default(0) @db.Decimal(10, 2)
+
+  @@index([status])
+  @@index([createdAt])
+}
