@@ -5,6 +5,7 @@ import {
   MAX_FILES,
   uploadPhoto,
 } from "@/lib/storage";
+import { deletePhoto } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -86,6 +87,63 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Photo upload failed.";
+    return Response.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request): Promise<Response> {
+  const authenticated = await isAuthenticated();
+  if (!authenticated) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json(
+      { error: "Invalid JSON body." },
+      { status: 400 },
+    );
+  }
+
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("url" in body) ||
+    typeof body.url !== "string"
+  ) {
+    return Response.json(
+      { error: "url must be a string." },
+      { status: 400 },
+    );
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    return Response.json(
+      {
+        error:
+          "Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL",
+      },
+      { status: 500 },
+    );
+  }
+
+  const allowedPublicPrefix = `${supabaseUrl}/storage/v1/object/public/`;
+  if (!body.url.startsWith(allowedPublicPrefix)) {
+    return Response.json(
+      { error: "A photo URL is not from the app's own storage." },
+      { status: 400 },
+    );
+  }
+
+  try {
+    await deletePhoto(body.url);
+    return Response.json({ ok: true });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Photo deletion failed.";
     return Response.json({ error: message }, { status: 500 });
   }
 }

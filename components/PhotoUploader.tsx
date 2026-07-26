@@ -238,6 +238,24 @@ export default function PhotoUploader({
     );
     itemsRef.current = nextItems;
     setItems(nextItems);
+
+    if (itemToRemove.status === "done" && itemToRemove.url) {
+      void fetch("/api/upload", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: itemToRemove.url }),
+      })
+        .then((response: Response): void => {
+          if (!response.ok) {
+            throw new Error("Stored photo deletion failed.");
+          }
+        })
+        .catch((): void => {
+          setMessage(
+            "Photo removed, but the stored file could not be deleted.",
+          );
+        });
+    }
   }
 
   return (

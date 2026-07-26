@@ -65,3 +65,27 @@ export async function uploadPhoto(
 
   return client.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
+
+export async function deletePhoto(publicUrl: string): Promise<void> {
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET ?? "item-photos";
+  const publicPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/`;
+
+  if (!publicUrl.startsWith(publicPrefix)) {
+    throw new Error("The URL is not a photo in this app's storage bucket.");
+  }
+
+  const encodedObjectPath = publicUrl.slice(publicPrefix.length);
+  if (!encodedObjectPath) {
+    throw new Error("The photo URL does not contain a storage object path.");
+  }
+
+  const objectPath = decodeURIComponent(encodedObjectPath);
+  const client = getSupabaseClient();
+
+  // Supabase treats a missing object as a no-op, so repeated deletion is safe.
+  const { error } = await client.storage.from(bucket).remove([objectPath]);
+
+  if (error) {
+    throw new Error(`Supabase photo deletion failed: ${error.message}`);
+  }
+}

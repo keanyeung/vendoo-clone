@@ -32,18 +32,30 @@ model Item {
   photos String[]
 
   // Listing content (AI-drafted, user-editable).
-  title       String
-  description String  @db.Text
-  brand       String?
-  category    String?
-  size        String?
-  color       String?
-  condition   String?
+  title          String
+  description    String  @db.Text
+  brand          String?
+  category       String?
+  size           String?
+  color          String?
+  condition      String? // one of CONDITION_VALUES; kept as text so tiers can change without a migration
+  conditionNotes String? @db.Text
 
   // Pricing.
   suggestedPrice Decimal? @db.Decimal(10, 2) // AI estimate
+  priceLow       Decimal? @db.Decimal(10, 2) // AI resale range, low end
+  priceHigh      Decimal? @db.Decimal(10, 2) // AI resale range, high end
+  priceReasoning String?  @db.Text // why the AI landed on that price
   listPrice      Decimal  @db.Decimal(10, 2) // what you actually listed at
   purchasePrice  Decimal  @db.Decimal(10, 2) // what you paid
+
+  // Other AI output.
+  keywords     String[] @default([])
+  aiConfidence String? // one of CONFIDENCE_VALUES
+
+  // Your own sourcing details.
+  purchaseDate DateTime?
+  notes        String?   @db.Text // private notes, never shown in a listing
 
   status ItemStatus @default(LISTED)
 
