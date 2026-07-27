@@ -84,3 +84,80 @@ export function formatZodIssues(error: z.ZodError): string {
     })
     .join("; ");
 }
+
+export const UpdateItemSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, { message: "Title is required." })
+    .max(140),
+  description: z
+    .string()
+    .min(1, { message: "Description is required." }),
+  brand: z.string().nullable(),
+  category: z
+    .string()
+    .trim()
+    .min(1, { message: "Category is required." }),
+  size: z.string().nullable(),
+  color: z.string().nullable(),
+  condition: z.enum(CONDITION_VALUES),
+  conditionNotes: z.string().nullable(),
+  listPrice: money.positive({
+    message: "List price must be greater than 0.",
+  }),
+  purchasePrice: money.nonnegative({
+    message: "Purchase price cannot be negative.",
+  }),
+  keywords: z.array(z.string()).max(15).default([]),
+  purchaseDate: z
+    .string()
+    .refine((value: string): boolean => !Number.isNaN(Date.parse(value)), {
+      message: "Purchase date is invalid.",
+    })
+    .nullable(),
+  notes: z.string().nullable(),
+  // Photos, AI reference fields, status, and sale fields have separate ownership or actions.
+});
+
+export const MarkSoldSchema = z.object({
+  soldPrice: money.positive({
+    message: "Sold price must be greater than 0.",
+  }),
+  soldPlatform: z.enum(["FB_MARKETPLACE", "DEPOP", "EBAY"]),
+  soldDate: z
+    .string()
+    .refine((value: string): boolean => !Number.isNaN(Date.parse(value)), {
+      message: "Sold date is invalid.",
+    }),
+  platformFees: money
+    .nonnegative({
+      message: "Platform fees cannot be negative.",
+    })
+    .nullable(),
+});
+
+export const SetStatusSchema = z.object({
+  // SOLD requires the complete sale record supplied by the mark_sold action.
+  status: z.enum(["DRAFT", "LISTED"]),
+});
+
+export const ItemMutationSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("update"),
+    data: UpdateItemSchema,
+  }),
+  z.object({
+    action: z.literal("mark_sold"),
+    data: MarkSoldSchema,
+  }),
+  z.object({
+    action: z.literal("set_status"),
+    data: SetStatusSchema,
+  }),
+]);
+
+export type UpdateItemInput = z.infer<typeof UpdateItemSchema>;
+export type MarkSoldInput = z.infer<typeof MarkSoldSchema>;
+export type SetStatusInput = z.infer<typeof SetStatusSchema>;
+export type ItemMutationInput = z.infer<typeof ItemMutationSchema>;

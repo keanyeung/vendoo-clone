@@ -210,7 +210,13 @@ export default async function ListingsPage(props: {
       ) : (
         <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {itemDtos.map((item: ItemDto) => (
-            <ListingCard key={item.id} item={item} />
+            <Link
+              key={item.id}
+              href={`/listings/${item.id}`}
+              className="rounded-xl transition-colors hover:bg-black/[.03] dark:hover:bg-white/[.04]"
+            >
+              <ListingCard item={item} />
+            </Link>
           ))}
         </section>
       )}

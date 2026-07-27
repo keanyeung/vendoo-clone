@@ -199,12 +199,12 @@ export default function ItemForm({
         </div>
         <div className="space-y-1">
           <label htmlFor="listPrice" className="text-sm font-medium">List price</label>
-          <input id="listPrice" type="number" step="0.01" min="0" inputMode="decimal" value={listPrice} onChange={(event) => setListPrice(event.target.value)} className={control} />
+          <input id="listPrice" type="number" step="0.01" min="0" inputMode="decimal" onWheel={(event) => event.currentTarget.blur()} value={listPrice} onChange={(event) => setListPrice(event.target.value)} className={control} />
           <ErrorText name="listPrice" errors={fieldErrors} />
         </div>
         <div className="space-y-1">
           <label htmlFor="purchasePrice" className="text-sm font-medium">Purchase price</label>
-          <input id="purchasePrice" type="number" step="0.01" min="0" inputMode="decimal" value={purchasePrice} onChange={(event) => setPurchasePrice(event.target.value)} className={control} />
+          <input id="purchasePrice" type="number" step="0.01" min="0" inputMode="decimal" onWheel={(event) => event.currentTarget.blur()} value={purchasePrice} onChange={(event) => setPurchasePrice(event.target.value)} className={control} />
           <ErrorText name="purchasePrice" errors={fieldErrors} />
         </div>
         <div className="space-y-1">
