@@ -6,21 +6,25 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type ListingsFilterBarProps = {
   status: string;
   q: string;
   sort: string;
+  view: "grid" | "table";
 };
 
 export default function ListingsFilterBar({
   status,
   q,
   sort,
+  view,
 }: ListingsFilterBarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const rawSort = searchParams.get("sort") ?? "";
   const [searchText, setSearchText] = useState(q);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   // The q value this component last navigated to, so the effect below can tell
@@ -50,7 +54,8 @@ export default function ListingsFilterBar({
 
     if (nextStatus) params.set("status", nextStatus);
     if (trimmedQ) params.set("q", trimmedQ);
-    if (nextSort !== "newest") params.set("sort", nextSort);
+    if (nextSort && nextSort !== "newest") params.set("sort", nextSort);
+    if (view === "table") params.set("view", "table");
 
     navigatedQRef.current = trimmedQ;
 
@@ -60,7 +65,7 @@ export default function ListingsFilterBar({
 
   function handleStatusChange(event: ChangeEvent<HTMLSelectElement>): void {
     clearTimeout(searchTimeoutRef.current);
-    navigate(event.target.value, searchText, sort);
+    navigate(event.target.value, searchText, rawSort);
   }
 
   function handleSearchChange(event: ChangeEvent<HTMLInputElement>): void {
@@ -68,7 +73,7 @@ export default function ListingsFilterBar({
     setSearchText(nextSearchText);
     clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout((): void => {
-      navigate(status, nextSearchText, sort);
+      navigate(status, nextSearchText, rawSort);
     }, 300);
   }
 
@@ -81,11 +86,19 @@ export default function ListingsFilterBar({
     clearTimeout(searchTimeoutRef.current);
     setSearchText("");
     navigatedQRef.current = "";
-    router.replace(pathname);
+    router.replace(view === "table" ? `${pathname}?view=table` : pathname);
   }
 
   const hasActiveFilters =
     status !== "" || q.trim() !== "" || sort !== "newest";
+  const selectValue = [
+    "newest",
+    "oldest",
+    "price-high",
+    "price-low",
+  ].includes(sort)
+    ? sort
+    : "newest";
   const controlClassName =
     "rounded-md border border-black/15 bg-white px-3 py-2 text-base text-black outline-none focus:border-black/40 dark:border-white/20 dark:bg-black dark:text-white dark:focus:border-white/50";
 
@@ -116,19 +129,21 @@ export default function ListingsFilterBar({
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm font-medium">
-        Sort
-        <select
-          value={sort}
-          onChange={handleSortChange}
-          className={controlClassName}
-        >
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-          <option value="price-high">Price: high to low</option>
-          <option value="price-low">Price: low to high</option>
-        </select>
-      </label>
+      {view === "grid" && (
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          Sort
+          <select
+            value={selectValue}
+            onChange={handleSortChange}
+            className={controlClassName}
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="price-high">Price: high to low</option>
+            <option value="price-low">Price: low to high</option>
+          </select>
+        </label>
+      )}
 
       {hasActiveFilters && (
         <button

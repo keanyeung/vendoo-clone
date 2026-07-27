@@ -2,8 +2,12 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { ItemStatus, Prisma } from "@prisma/client";
 import ListingsFilterBar from "@/components/ListingsFilterBar";
+import ListingsTable from "@/components/ListingsTable";
+import ListingsViewToggle from "@/components/ListingsViewToggle";
 import type { ItemDto } from "@/lib/item-dto";
 import { toItemDtos } from "@/lib/item-dto";
+import { parseSort, sortItems } from "@/lib/listing-sort";
+import { STATUS_STYLES } from "@/lib/status-style";
 import { prisma } from "@/lib/db";
 
 // This database-backed page must render fresh on every request, not with stale build-time data.
@@ -40,29 +44,9 @@ function isSortValue(value: string): value is SortValue {
   );
 }
 
-const statusStyles = {
-  DRAFT: {
-    label: "Draft",
-    className:
-      "bg-black/[.06] text-black/65 dark:bg-white/10 dark:text-white/70",
-  },
-  LISTED: {
-    label: "Listed",
-    className: "bg-foreground text-background",
-  },
-  SOLD: {
-    label: "Sold",
-    className:
-      "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200",
-  },
-} satisfies Record<
-  ItemDto["status"],
-  { label: string; className: string }
->;
-
 function ListingCard({ item }: { item: ItemDto }) {
   const photo = item.photos[0];
-  const status = statusStyles[item.status];
+  const status = STATUS_STYLES[item.status];
   const metadata = [item.brand, item.size, item.category].filter(
     (value: string | null): value is string => value !== null,
   );
@@ -126,8 +110,14 @@ export default async function ListingsPage(props: {
   const statusParam = firstSearchParam(searchParams.status);
   const q = firstSearchParam(searchParams.q).trim();
   const sortParam = firstSearchParam(searchParams.sort);
+  const viewParam = firstSearchParam(searchParams.view);
   const status = isItemStatus(statusParam) ? statusParam : "";
   const sort: SortValue = isSortValue(sortParam) ? sortParam : "newest";
+  const view: "grid" | "table" =
+    viewParam === "table" ? "table" : "grid";
+  // Capture one request-time value so sorting and the hydrated table agree.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
 
   const where: Prisma.ItemWhereInput = {};
   if (status) where.status = status;
@@ -139,21 +129,11 @@ export default async function ListingsPage(props: {
     ];
   }
 
-  const orderByBySort = {
-    newest: { createdAt: "desc" },
-    oldest: { createdAt: "asc" },
-    "price-high": { listPrice: "desc" },
-    "price-low": { listPrice: "asc" },
-  } satisfies Record<SortValue, Prisma.ItemOrderByWithRelationInput>;
-
   const [items, totalItems] = await Promise.all([
-    prisma.item.findMany({
-      where,
-      orderBy: orderByBySort[sort],
-    }),
+    prisma.item.findMany({ where }),
     prisma.item.count(),
   ]);
-  const itemDtos = toItemDtos(items);
+  const itemDtos = sortItems(toItemDtos(items), parseSort(sortParam), now);
   const filtersActive = status !== "" || q !== "";
 
   return (
@@ -190,7 +170,18 @@ export default async function ListingsPage(props: {
         </div>
       </div>
 
-      <ListingsFilterBar status={status} q={q} sort={sort} />
+      <ListingsFilterBar status={status} q={q} sort={sort} view={view} />
+
+      {totalItems > 0 && (
+        <div className="mt-6 flex justify-end">
+          <ListingsViewToggle
+            view={view}
+            status={status}
+            q={q}
+            sort={sortParam}
+          />
+        </div>
+      )}
 
       {totalItems === 0 ? (
         <section className="mt-8 rounded-xl border border-black/15 px-6 py-12 text-center dark:border-white/20">
@@ -214,24 +205,28 @@ export default async function ListingsPage(props: {
             Try changing or clearing your filters.
           </p>
           <Link
-            href="/listings"
+            href={view === "table" ? "/listings?view=table" : "/listings"}
             className="mt-5 inline-block rounded-md border border-black/15 px-4 py-2 text-sm font-medium dark:border-white/20"
           >
             Clear filters
           </Link>
         </section>
       ) : (
-        <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {itemDtos.map((item: ItemDto) => (
-            <Link
-              key={item.id}
-              href={`/listings/${item.id}`}
-              className="rounded-xl transition-colors hover:bg-black/[.03] dark:hover:bg-white/[.04]"
-            >
-              <ListingCard item={item} />
-            </Link>
-          ))}
-        </section>
+        view === "table" ? (
+          <ListingsTable items={itemDtos} now={now} />
+        ) : (
+          <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {itemDtos.map((item: ItemDto) => (
+              <Link
+                key={item.id}
+                href={`/listings/${item.id}`}
+                className="rounded-xl transition-colors hover:bg-black/[.03] dark:hover:bg-white/[.04]"
+              >
+                <ListingCard item={item} />
+              </Link>
+            ))}
+          </section>
+        )
       )}
     </main>
   );
