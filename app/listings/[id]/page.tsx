@@ -4,6 +4,7 @@ import { CopyListingSection } from "@/components/CopyListingSection";
 import ItemEditSection from "@/components/ItemEditSection";
 import ItemLifecycleSection from "@/components/ItemLifecycleSection";
 import ItemSellSection from "@/components/ItemSellSection";
+import { computeProfit, computeRoi } from "@/lib/analytics";
 import type { ItemDto } from "@/lib/item-dto";
 import { toItemDto } from "@/lib/item-dto";
 import { prisma } from "@/lib/db";
@@ -78,16 +79,8 @@ export default async function ItemDetailPage(
     itemDto.priceHigh !== null ||
     itemDto.priceReasoning !== null ||
     itemDto.aiConfidence !== null;
-  const profit =
-    itemDto.soldPrice === null
-      ? null
-      : itemDto.soldPrice -
-        itemDto.purchasePrice -
-        (itemDto.platformFees ?? 0);
-  const roi =
-    profit === null || itemDto.purchasePrice === 0
-      ? null
-      : (profit / itemDto.purchasePrice) * 100;
+  const profit = computeProfit(itemDto);
+  const roi = computeRoi(itemDto);
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 p-6">

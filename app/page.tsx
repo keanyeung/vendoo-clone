@@ -19,6 +19,12 @@ export default function Home() {
           >
             Listings
           </Link>
+          <Link
+            href="/analytics"
+            className="rounded-md border border-black/15 px-3 py-1.5 text-sm hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
+          >
+            Analytics
+          </Link>
           <form action={logout}>
             <button
               type="submit"
@@ -32,7 +38,7 @@ export default function Home() {
 
       <p className="mt-6 text-sm text-black/60 dark:text-white/60">
         Photograph an item and let AI draft the listing details. Then save it to
-        your inventory.
+        your inventory. Track your sales and profit in Analytics.
       </p>
     </main>
   );

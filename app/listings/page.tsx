@@ -169,12 +169,20 @@ export default async function ListingsPage(props: {
               : `${itemDtos.length} ${itemDtos.length === 1 ? "item" : "items"}`}
           </p>
         </div>
-        <Link
-          href="/new"
-          className="self-start rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background"
-        >
-          New Listing
-        </Link>
+        <div className="flex items-center gap-2 self-start">
+          <Link
+            href="/new"
+            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background"
+          >
+            New Listing
+          </Link>
+          <Link
+            href="/analytics"
+            className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
+          >
+            Analytics
+          </Link>
+        </div>
       </div>
 
       <ListingsFilterBar status={status} q={q} sort={sort} />
