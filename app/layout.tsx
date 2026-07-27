@@ -13,7 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Vendoo Clone",
+  title: {
+    default: "Vendoo Clone",
+    template: "%s · Vendoo Clone",
+  },
   description: "Personal reselling assistant and inventory tracker",
 };
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import type { ItemStatus, Prisma } from "@prisma/client";
 import ListingsFilterBar from "@/components/ListingsFilterBar";
 import type { ItemDto } from "@/lib/item-dto";
@@ -7,6 +8,10 @@ import { prisma } from "@/lib/db";
 
 // This database-backed page must render fresh on every request, not with stale build-time data.
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Listings",
+};
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",

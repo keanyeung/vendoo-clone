@@ -22,7 +22,7 @@ export default function AnalyticsRangeToggle({
   }
 
   return (
-    <div className="mt-5 flex w-fit gap-2" aria-label="Analytics range">
+    <div className="mt-5 flex w-fit flex-wrap gap-2" aria-label="Analytics range">
       {ANALYTICS_RANGES.map((value: AnalyticsRange) => {
         const isSelected = value === range;
 
@@ -32,7 +32,7 @@ export default function AnalyticsRangeToggle({
             type="button"
             aria-pressed={isSelected}
             onClick={(): void => selectRange(value)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`min-h-11 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
               isSelected
                 ? "bg-foreground text-background"
                 : "border border-black/15 hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"

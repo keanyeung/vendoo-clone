@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CopyListingSection } from "@/components/CopyListingSection";
 import ItemEditSection from "@/components/ItemEditSection";
@@ -11,6 +12,20 @@ import { prisma } from "@/lib/db";
 
 // This database-backed page must render fresh on every request.
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(
+  props: PageProps<"/listings/[id]">,
+): Promise<Metadata> {
+  const { id } = await props.params;
+  const item = await prisma.item.findUnique({
+    where: { id },
+    select: { title: true },
+  });
+
+  return {
+    title: item?.title ?? "Item not found",
+  };
+}
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",

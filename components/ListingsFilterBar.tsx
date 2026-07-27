@@ -87,7 +87,7 @@ export default function ListingsFilterBar({
   const hasActiveFilters =
     status !== "" || q.trim() !== "" || sort !== "newest";
   const controlClassName =
-    "rounded-md border border-black/15 bg-white px-3 py-2 text-sm text-black outline-none focus:border-black/40 dark:border-white/20 dark:bg-black dark:text-white dark:focus:border-white/50";
+    "rounded-md border border-black/15 bg-white px-3 py-2 text-base text-black outline-none focus:border-black/40 dark:border-white/20 dark:bg-black dark:text-white dark:focus:border-white/50";
 
   return (
     <div className="mt-6 flex flex-col gap-4 rounded-xl border border-black/15 p-4 dark:border-white/20 sm:flex-row sm:items-end">
@@ -134,7 +134,7 @@ export default function ListingsFilterBar({
         <button
           type="button"
           onClick={clearFilters}
-          className="rounded-md border border-black/15 px-3 py-2 text-sm font-medium text-black/60 hover:text-black dark:border-white/20 dark:text-white/60 dark:hover:text-white"
+          className="min-h-11 rounded-md border border-black/15 px-3 py-2.5 text-sm font-medium text-black/60 hover:text-black dark:border-white/20 dark:text-white/60 dark:hover:text-white"
         >
           Clear filters
         </button>

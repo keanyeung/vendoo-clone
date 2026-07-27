@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import AnalyticsRangeToggle from "@/components/AnalyticsRangeToggle";
 import ProfitChart from "@/components/ProfitChart";
 import {
@@ -11,6 +12,10 @@ import { toItemDtos } from "@/lib/item-dto";
 
 // This database-backed page must render fresh on every request, not with stale build-time data.
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Analytics",
+};
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",

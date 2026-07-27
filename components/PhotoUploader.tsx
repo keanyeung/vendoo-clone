@@ -75,6 +75,7 @@ export default function PhotoUploader({
   const [message, setMessage] = useState<string>();
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const itemsRef = useRef<UploadItem[]>([]);
   const onChangeRef = useRef(onChange);
   const notifiedUrlsRef = useRef<string | undefined>(undefined);
@@ -267,7 +268,17 @@ export default function PhotoUploader({
         accept={acceptedTypes}
         disabled={disabled}
         onChange={handleInputChange}
-        className="sr-only"
+        className="sr-only text-base"
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        multiple
+        accept={acceptedTypes}
+        capture="environment"
+        disabled={disabled}
+        onChange={handleInputChange}
+        className="sr-only text-base"
       />
 
       <div
@@ -294,6 +305,15 @@ export default function PhotoUploader({
           Up to {maxFiles} photos, {formatMegabytes(MAX_FILE_BYTES)} each
         </p>
       </div>
+
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => cameraInputRef.current?.click()}
+        className="min-h-11 rounded-md border border-black/15 px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20"
+      >
+        Take photo
+      </button>
 
       {message && (
         <div

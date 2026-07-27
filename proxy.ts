@@ -30,5 +30,9 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   // Run on everything except API routes, Next internals, and static assets.
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.png$).*)"],
+  // icon.svg is the app icon generated from app/icon.svg; it must stay public so
+  // the favicon renders on the login page, where there is no session yet.
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|icon.svg|.*\\.png$).*)",
+  ],
 };
