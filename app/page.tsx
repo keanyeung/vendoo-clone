@@ -13,6 +13,12 @@ export default function Home() {
           >
             New Listing
           </Link>
+          <Link
+            href="/listings"
+            className="rounded-md border border-black/15 px-3 py-1.5 text-sm hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
+          >
+            Listings
+          </Link>
           <form action={logout}>
             <button
               type="submit"
@@ -25,9 +31,8 @@ export default function Home() {
       </div>
 
       <p className="mt-6 text-sm text-black/60 dark:text-white/60">
-        Phase 0 foundation is live — Next.js, Postgres (Prisma), and the login
-        gate are wired up. Next phases will add photo upload, AI listing drafts,
-        the inventory view, and analytics.
+        Photograph an item and let AI draft the listing details. Then save it to
+        your inventory.
       </p>
     </main>
   );

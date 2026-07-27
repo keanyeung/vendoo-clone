@@ -146,9 +146,14 @@ export default function NewListingPage() {
             <h2 className="text-xl font-semibold">Item saved</h2>
             <p className="mt-1 text-black/60 dark:text-white/60">{savedTitle}</p>
           </div>
-          <button type="button" onClick={handleCreateAnother} className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background">
-            Create another
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={handleCreateAnother} className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background">
+              Create another
+            </button>
+            <Link href="/listings" className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]">
+              View listings
+            </Link>
+          </div>
         </section>
       ) : (
         <>
