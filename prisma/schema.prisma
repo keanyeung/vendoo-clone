@@ -68,3 +68,14 @@ model Item {
   @@index([status])
   @@index([createdAt])
 }
+
+// One row per failed login attempt, used to rate-limit password guessing.
+// The client IP is stored as an HMAC (keyed by SESSION_SECRET), never in the
+// clear, so the table cannot be used to reconstruct who tried to log in.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  ipHash    String
+  createdAt DateTime @default(now())
+
+  @@index([ipHash, createdAt])
+}
