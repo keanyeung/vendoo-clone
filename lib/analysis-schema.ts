@@ -42,7 +42,7 @@ export const AnalysisSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "Size exactly as printed on the tag if visible, for example M, US 10, or 32x30. Null if no size is visible in the photos.",
+      "The item's department and size, formatted as '<Department> <Size>' where Department is Men's, Women's, or Unisex, inferred from the tag, cut, or styling. Use the size as printed on the tag, for example 'Men's Medium', \"Women's Small\", 'Unisex Large', or 'Men's 32x30'. For footwear, give BOTH US sizes separated by ' / ' as \"Men's 10 / Women's 11.5\" (women's US runs about 1.5 sizes larger than men's). Null if no size is visible in the photos.",
     ),
   color: z
     .string()

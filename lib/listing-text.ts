@@ -14,6 +14,10 @@ const CONDITION_PHRASES: Record<string, string> = {
   poor: "Poor condition",
 };
 
+// Whether a condition tier is presented as flawless. Everything with real wear
+// (good/fair/poor) is disclosed as having minor flaws for buyer honesty.
+const NO_FLAW_CONDITIONS = new Set<string>(["new_with_tags", "excellent"]);
+
 export const PLATFORM_LABELS = {
   FB_MARKETPLACE: "Facebook Marketplace",
   DEPOP: "Depop",
@@ -60,7 +64,10 @@ function formatFacebook(item: ItemDto): string {
   const conditionPhrase = CONDITION_PHRASES[item.condition ?? ""];
 
   if (conditionPhrase !== undefined) {
-    detailLines.push(conditionPhrase);
+    const flaws = NO_FLAW_CONDITIONS.has(item.condition ?? "")
+      ? "no flaws"
+      : "minor flaws";
+    detailLines.push(`${conditionPhrase}, ${flaws}`);
   }
   if (hasValue(item.size)) {
     detailLines.push(`Size: ${item.size}`);
