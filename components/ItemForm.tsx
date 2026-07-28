@@ -1,13 +1,15 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
+import { CopyListingSection } from "@/components/CopyListingSection";
 import { CONDITION_VALUES, type Analysis } from "@/lib/analysis-schema";
+import type { ItemDto } from "@/lib/item-dto";
 import { CreateItemSchema } from "@/lib/item-schema";
 
 export type ItemFormProps = {
   analysis: Analysis;
   photoUrls: string[];
-  onSaved: (id: string, title: string) => void;
+  onSaved: (item: ItemDto) => void;
 };
 
 type FieldErrors = Record<string, string>;
@@ -63,6 +65,46 @@ export default function ItemForm({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  function buildItemDto(id: string, status: ItemStatus): ItemDto {
+    const now = new Date().toISOString();
+    const toMoney = (value: string): number =>
+      Number.isFinite(Number(value)) ? Number(value) : 0;
+
+    return {
+      id,
+      createdAt: now,
+      updatedAt: now,
+      photos: photoUrls,
+      title,
+      summary: nullable(summary),
+      description,
+      brand: nullable(brand),
+      category,
+      size: nullable(size),
+      color: nullable(color),
+      condition,
+      conditionNotes: nullable(conditionNotes),
+      suggestedPrice: suggestedPrice === "" ? null : Number(suggestedPrice),
+      priceLow: priceLow === "" ? null : Number(priceLow),
+      priceHigh: priceHigh === "" ? null : Number(priceHigh),
+      priceReasoning: nullable(priceReasoning),
+      listPrice: toMoney(listPrice),
+      purchasePrice: toMoney(purchasePrice),
+      keywords: keywords
+        .split(",")
+        .map((value: string): string => value.trim())
+        .filter((value: string): boolean => value !== ""),
+      aiConfidence: analysis.confidence,
+      purchaseDate: nullable(purchaseDate),
+      notes: nullable(notes),
+      status,
+      soldPrice: null,
+      soldPlatform: null,
+      soldDate: null,
+      platformFees: null,
+    };
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -144,7 +186,7 @@ export default function ItemForm({
         setSubmitError("The save response was incomplete. Please try again.");
         return;
       }
-      onSaved(body.id, parsed.data.title);
+      onSaved(buildItemDto(body.id, status));
     } catch {
       setSubmitError(
         "Could not reach the save service. Check your connection and try again.",
@@ -167,7 +209,8 @@ export default function ItemForm({
   ];
 
   return (
-    <form onSubmit={(event) => void handleSubmit(event)} className="space-y-6 rounded-xl border border-black/15 p-5 dark:border-white/20">
+    <>
+      <form onSubmit={(event) => void handleSubmit(event)} className="space-y-6 rounded-xl border border-black/15 p-5 dark:border-white/20">
       <div>
         <h2 className="text-xl font-semibold">Review item details</h2>
         <p className="mt-1 text-sm text-black/60 dark:text-white/60">
@@ -258,6 +301,8 @@ export default function ItemForm({
         <button type="submit" name="status" value="LISTED" disabled={isSaving} className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60">{isSaving ? "Saving…" : "Save item"}</button>
         <button type="submit" name="status" value="DRAFT" disabled={isSaving} className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20">Save as draft</button>
       </div>
-    </form>
+      </form>
+      <CopyListingSection item={buildItemDto("preview", "LISTED")} />
+    </>
   );
 }

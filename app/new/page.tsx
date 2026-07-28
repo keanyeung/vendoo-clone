@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { CopyListingSection } from "@/components/CopyListingSection";
 import ItemForm from "@/components/ItemForm";
 import PhotoUploader from "@/components/PhotoUploader";
 import type { Analysis } from "@/lib/analysis-schema";
+import type { ItemDto } from "@/lib/item-dto";
 
 type AnalysisUsage = {
   inputTokens: number;
@@ -29,8 +31,7 @@ export default function NewListingPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [analysisKey, setAnalysisKey] = useState<number>(0);
   const [uploaderKey, setUploaderKey] = useState<number>(0);
-  const [savedId, setSavedId] = useState<string | null>(null);
-  const [savedTitle, setSavedTitle] = useState<string>("");
+  const [savedItem, setSavedItem] = useState<ItemDto | null>(null);
   const uploadedUrlsKeyRef = useRef<string>(JSON.stringify([]));
 
   function handleUploadedUrlsChange(urls: string[]): void {
@@ -111,14 +112,12 @@ export default function NewListingPage() {
     }
   }
 
-  function handleSaved(id: string, title: string): void {
-    setSavedId(id);
-    setSavedTitle(title);
+  function handleSaved(item: ItemDto): void {
+    setSavedItem(item);
   }
 
   function handleCreateAnother(): void {
-    setSavedId(null);
-    setSavedTitle("");
+    setSavedItem(null);
     setAnalysis(null);
     setUsage(null);
     setErrorMessage(null);
@@ -140,12 +139,13 @@ export default function NewListingPage() {
         </p>
       </div>
 
-      {savedId ? (
+      {savedItem ? (
         <section className="mt-8 space-y-4 rounded-xl border border-black/15 p-6 dark:border-white/20">
           <div>
             <h2 className="text-xl font-semibold">Item saved</h2>
-            <p className="mt-1 text-black/60 dark:text-white/60">{savedTitle}</p>
+            <p className="mt-1 text-black/60 dark:text-white/60">{savedItem.title}</p>
           </div>
+          <CopyListingSection item={savedItem} />
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={handleCreateAnother} className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background">
               Create another
