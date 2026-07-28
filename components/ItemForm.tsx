@@ -36,6 +36,7 @@ export default function ItemForm({
   onSaved,
 }: ItemFormProps) {
   const [title, setTitle] = useState<string>(analysis.title);
+  const [summary, setSummary] = useState<string>(analysis.summary);
   const [description, setDescription] = useState<string>(analysis.description);
   const [brand, setBrand] = useState<string>(analysis.brand ?? "");
   const [category, setCategory] = useState<string>(analysis.category);
@@ -77,6 +78,7 @@ export default function ItemForm({
     const payload = {
       photos: photoUrls,
       title,
+      summary: nullable(summary),
       description,
       brand: nullable(brand),
       category,
@@ -177,6 +179,11 @@ export default function ItemForm({
           <label htmlFor="title" className="text-sm font-medium">Title</label>
           <input id="title" value={title} onChange={(event) => setTitle(event.target.value)} className={control} />
           <ErrorText name="title" errors={fieldErrors} />
+        </div>
+        <div className="space-y-1 sm:col-span-2">
+          <label htmlFor="summary" className="text-sm font-medium">Summary</label>
+          <textarea id="summary" rows={2} value={summary} onChange={(event) => setSummary(event.target.value)} className={control} />
+          <ErrorText name="summary" errors={fieldErrors} />
         </div>
         <div className="space-y-1 sm:col-span-2">
           <label htmlFor="description" className="text-sm font-medium">Description</label>

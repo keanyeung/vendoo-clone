@@ -29,6 +29,7 @@ export const CreateItemSchema = z
       .trim()
       .min(1, { message: "Title is required." })
       .max(140),
+    summary: z.string().nullable(),
     description: z
       .string()
       .min(1, { message: "Description is required." }),
@@ -91,6 +92,7 @@ export const UpdateItemSchema = z.object({
     .trim()
     .min(1, { message: "Title is required." })
     .max(140),
+  summary: z.string().nullable(),
   description: z
     .string()
     .min(1, { message: "Description is required." }),

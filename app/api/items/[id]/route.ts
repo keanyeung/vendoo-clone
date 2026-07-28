@@ -49,6 +49,7 @@ export async function PATCH(
           where: { id },
           data: {
             title: mutation.data.title,
+            summary: mutation.data.summary,
             description: mutation.data.description,
             brand: mutation.data.brand,
             category: mutation.data.category,

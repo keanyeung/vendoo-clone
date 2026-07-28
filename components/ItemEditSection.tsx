@@ -21,6 +21,7 @@ type Condition = (typeof CONDITION_VALUES)[number];
 type FieldErrors = Record<string, string>;
 type FormState = {
   title: string;
+  summary: string;
   description: string;
   brand: string;
   category: string;
@@ -49,6 +50,7 @@ function deriveFormState(item: ItemDto): FormState {
 
   return {
     title: item.title,
+    summary: item.summary ?? "",
     description: item.description,
     brand: item.brand ?? "",
     category: item.category ?? "",
@@ -145,6 +147,7 @@ export default function ItemEditSection({
 
     const payload = {
       title: form.title,
+      summary: nullable(form.summary),
       description: form.description,
       brand: nullable(form.brand),
       category: form.category,
@@ -276,6 +279,20 @@ export default function ItemEditSection({
                 className={control}
               />
               <ErrorText name="title" errors={fieldErrors} />
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <label htmlFor="edit-summary" className="text-sm font-medium">
+                Summary
+              </label>
+              <textarea
+                id="edit-summary"
+                rows={2}
+                value={form.summary}
+                onChange={updateField("summary")}
+                className={control}
+              />
+              <ErrorText name="summary" errors={fieldErrors} />
             </div>
 
             <div className="space-y-1 sm:col-span-2">

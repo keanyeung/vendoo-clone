@@ -7,6 +7,7 @@ export type ItemDto = {
   updatedAt: string;
   photos: string[];
   title: string;
+  summary: string | null;
   description: string;
   brand: string | null;
   category: string | null;
@@ -38,6 +39,7 @@ export function toItemDto(item: Item): ItemDto {
     updatedAt: item.updatedAt.toISOString(),
     photos: item.photos,
     title: item.title,
+    summary: item.summary,
     description: item.description,
     brand: item.brand,
     category: item.category,

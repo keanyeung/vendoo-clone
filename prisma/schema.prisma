@@ -33,6 +33,7 @@ model Item {
 
   // Listing content (AI-drafted, user-editable).
   title          String
+  summary        String? @db.Text // one-sentence product summary, used in platform copy (e.g. Facebook)
   description    String  @db.Text
   brand          String?
   category       String?

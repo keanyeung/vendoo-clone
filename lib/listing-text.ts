@@ -2,6 +2,18 @@ import type { ItemDto } from "@/lib/item-dto";
 
 export type ListingPlatform = "FB_MARKETPLACE" | "DEPOP" | "EBAY";
 
+// Your fixed pickup/payment line, appended to every Facebook listing.
+export const FB_PICKUP_DETAILS =
+  "E-transfer or cash accepted, pickup in North Haven or meetups in NW Calgary";
+
+const CONDITION_PHRASES: Record<string, string> = {
+  new_with_tags: "New with tags",
+  excellent: "Excellent condition",
+  good: "Good condition",
+  fair: "Fair condition",
+  poor: "Poor condition",
+};
+
 export const PLATFORM_LABELS = {
   FB_MARKETPLACE: "Facebook Marketplace",
   DEPOP: "Depop",
@@ -42,10 +54,33 @@ function hasValue(value: string | null): value is string {
   return value !== null && value.trim().length > 0;
 }
 
+function formatFacebook(item: ItemDto): string {
+  const summary = hasValue(item.summary) ? item.summary.trim() : "";
+  const detailLines: string[] = [];
+  const conditionPhrase = CONDITION_PHRASES[item.condition ?? ""];
+
+  if (conditionPhrase !== undefined) {
+    detailLines.push(conditionPhrase);
+  }
+  if (hasValue(item.size)) {
+    detailLines.push(`Size: ${item.size}`);
+  }
+  detailLines.push(FB_PICKUP_DETAILS);
+
+  return [summary, detailLines.join("\n")]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
 export function formatListingText(
   item: ItemDto,
   platform: ListingPlatform,
 ): string {
+  if (platform === "FB_MARKETPLACE") {
+    return formatFacebook(item);
+  }
+
   const title =
     platform === "EBAY"
       ? truncateTitle(item.title, EBAY_TITLE_MAX_LENGTH)

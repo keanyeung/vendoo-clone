@@ -69,6 +69,7 @@ export async function POST(request: Request): Promise<Response> {
       data: {
         photos: data.photos,
         title: data.title,
+        summary: data.summary,
         description: data.description,
         brand: data.brand,
         category: data.category,

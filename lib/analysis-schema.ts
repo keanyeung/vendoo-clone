@@ -17,6 +17,11 @@ export const AnalysisSchema = z.object({
     .describe(
       "Marketplace-ready listing title, roughly 60-80 characters. Lead with the brand, then the item type, then key attributes such as size and colour. Write it the way an experienced reseller would title a listing, not as a sentence.",
     ),
+  summary: z
+    .string()
+    .describe(
+      "One concise sentence (under ~20 words) summarizing the item for a marketplace listing: what it is, the brand, and one or two standout attributes. Do not include price, condition, or size — those are shown on their own lines. Plain text, exactly one sentence.",
+    ),
   description: z
     .string()
     .describe(
