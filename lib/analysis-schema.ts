@@ -25,7 +25,7 @@ export const AnalysisSchema = z.object({
   description: z
     .string()
     .describe(
-      "Buyer-facing listing description of 3 to 6 sentences. Cover what the item is, visible materials or construction, fit, and condition. Be honest about flaws. Do not invent details that are not visible in the photos. Plain text only, no markdown.",
+      "Buyer-facing listing description of no more than 2 sentences. State what the item is with its most notable features or construction, and give a brief, honest note on condition. Do not invent details that are not visible in the photos. Plain text only, no markdown.",
     ),
   brand: z
     .string()
