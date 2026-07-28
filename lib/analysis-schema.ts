@@ -25,7 +25,7 @@ export const AnalysisSchema = z.object({
   description: z
     .string()
     .describe(
-      "Buyer-facing listing description of no more than 2 sentences. State what the item is with its most notable features or construction, and give a brief, honest note on condition. Do not invent details that are not visible in the photos. Plain text only, no markdown.",
+      "Concise buyer-facing listing description of exactly 2 short sentences and no more than 35 words total. In the first sentence, identify the item and its most notable visible features. In the second sentence, briefly and honestly summarize its condition. Do not invent details that are not visible in the photos. Plain text only, no markdown.",
     ),
   brand: z
     .string()
@@ -58,7 +58,7 @@ export const AnalysisSchema = z.object({
   condition_notes: z
     .string()
     .describe(
-      "Specific wear or damage visible in the photos, such as pilling, stains, fading, sole wear, or missing buttons. If the item looks clean and unworn, say so briefly. Never speculate about damage that is not visible.",
+      "Exactly 1 concise sentence of no more than 18 words describing visible wear or damage. If no flaws are visible, say that briefly. Never speculate about damage that is not visible. Plain text only, no markdown.",
     ),
   suggested_price: z
     .number()
