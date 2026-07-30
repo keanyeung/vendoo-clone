@@ -105,8 +105,11 @@ export default function DashboardAnalytics({
                   key={bucket.key}
                   className="flex h-full flex-1 flex-col justify-end gap-1.5"
                 >
+                  {/* Capped and centred so a lone bucket reads as a bar rather than a
+                      slab of colour; at six buckets the column is narrower than the cap,
+                      so the full-width look is unchanged. */}
                   <div
-                    className={`w-full rounded-t-sm ${
+                    className={`mx-auto w-full max-w-16 rounded-t-sm ${
                       bucket.key === currentKey
                         ? "bg-green-600/70 dark:bg-green-400/70"
                         : "bg-green-600/30 dark:bg-green-400/35"

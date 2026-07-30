@@ -141,7 +141,9 @@ export default function DashboardListings({
 
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{item.title}</p>
-              <p className="mt-0.5 text-xs text-black/60 dark:text-white/60">
+              {/* Truncated like the title: unwrapped, this line runs to four rows on a
+                  phone and pushes the badge and price out of alignment. */}
+              <p className="mt-0.5 truncate text-xs text-black/60 dark:text-white/60">
                 {buildMetaLine(item, now)}
               </p>
             </div>

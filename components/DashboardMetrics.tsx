@@ -14,8 +14,14 @@ function formatDaysToSellTrend(
   current: number | null,
   previous: number | null,
 ): string {
-  if (current === null || previous === null) {
+  if (current === null) {
     return "not enough sales yet";
+  }
+
+  // Saying "not enough sales yet" here would contradict the figure shown above it:
+  // there are sales, just none last month to compare them against.
+  if (previous === null) {
+    return "no prior month to compare";
   }
 
   if (current < previous) {

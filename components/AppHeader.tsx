@@ -25,9 +25,16 @@ export default function AppHeader() {
 
   return (
     <header className="sticky top-0 z-10 border-b border-black/10 bg-background/90 backdrop-blur-sm dark:border-white/15">
-      <div className="mx-auto flex h-15 max-w-[1120px] items-center justify-between gap-6 px-6">
-        <div className="flex items-center gap-7">
-          <Link href="/" className="text-[15px] font-semibold tracking-tight">
+      {/* Tighter padding and cluster gap below sm: at 390px the nav and both buttons
+          need every pixel, and anything wider than the viewport scrolls the whole page. */}
+      <div className="mx-auto flex h-15 max-w-[1120px] items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6">
+        <div className="flex items-center gap-4 sm:gap-7">
+          {/* Hidden on phones: the wordmark plus both button labels overflow a 390px
+              viewport, and the Home link already covers what it would be tapped for. */}
+          <Link
+            href="/"
+            className="hidden min-h-11 items-center text-[15px] font-semibold tracking-tight sm:inline-flex"
+          >
             Vendoo Clone
           </Link>
           <nav className="flex items-center gap-1">
