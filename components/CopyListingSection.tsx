@@ -1,95 +1,54 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-
+import type { ListingCopyController } from "@/components/useListingCopy";
+import { useListingCopy } from "@/components/useListingCopy";
 import type { ItemDto } from "@/lib/item-dto";
 import {
   EBAY_TITLE_MAX_LENGTH,
-  formatListingText,
   formatPrice,
   LISTING_PLATFORMS,
   PLATFORM_LABELS,
-  truncateTitle,
 } from "@/lib/listing-text";
 import type { ListingPlatform } from "@/lib/listing-text";
 
 export type CopyListingSectionProps = {
   item: ItemDto;
+  showCopyActions?: boolean;
+  hideCopyActionsOnMobile?: boolean;
+  className?: string;
 };
 
-type CopyTarget = "listing" | "title";
+export type ControlledCopyListingSectionProps = CopyListingSectionProps & {
+  copy: ListingCopyController;
+};
 
-export function CopyListingSection({ item }: CopyListingSectionProps) {
-  const [selectedPlatform, setSelectedPlatform] =
-    useState<ListingPlatform>("FB_MARKETPLACE");
-  const [copiedTarget, setCopiedTarget] = useState<CopyTarget | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const listingText = formatListingText(item, selectedPlatform);
-  const title =
-    selectedPlatform === "EBAY"
-      ? truncateTitle(item.title, EBAY_TITLE_MAX_LENGTH)
-      : item.title;
-
-  function clearConfirmation(): void {
-    if (timeoutRef.current !== null) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    setCopiedTarget(null);
-  }
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current !== null) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  function selectPlatform(platform: ListingPlatform): void {
-    clearConfirmation();
-    setError(null);
-    setSelectedPlatform(platform);
-  }
-
-  async function copyText(text: string, target: CopyTarget): Promise<void> {
-    clearConfirmation();
-    setError(null);
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedTarget(target);
-      timeoutRef.current = setTimeout(() => {
-        setCopiedTarget(null);
-        timeoutRef.current = null;
-      }, 2000);
-    } catch {
-      setError(
-        "Copying was blocked. You can select the preview text and copy it manually.",
-      );
-    }
-  }
-
+function CopyListingSectionView({
+  item,
+  copy,
+  showCopyActions = true,
+  hideCopyActionsOnMobile = false,
+  className = "mt-8",
+}: ControlledCopyListingSectionProps) {
   return (
-    <section className="mt-8 rounded-xl border border-black/15 p-6 dark:border-white/20">
-      <h2 className="text-lg font-semibold">Copy listing</h2>
+    <section
+      className={`${className} rounded-xl border border-black/15 p-6 dark:border-white/20`}
+    >
+      <h2 className="text-lg font-semibold">Post it</h2>
       <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-        These platforms have no listing API, so copy this text into their
-        forms.
+        Copy this, switch to the marketplace app, and paste.
       </p>
 
-      <div className="mt-4 flex flex-wrap gap-2" aria-label="Listing platform">
+      <div className="mt-4 flex gap-2" aria-label="Listing platform">
         {LISTING_PLATFORMS.map((platform: ListingPlatform) => (
           <button
             key={platform}
             type="button"
-            onClick={() => selectPlatform(platform)}
-            aria-pressed={selectedPlatform === platform}
+            onClick={() => copy.selectPlatform(platform)}
+            aria-pressed={copy.selectedPlatform === platform}
             className={
-              selectedPlatform === platform
-                ? "rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background"
-                : "rounded-md border border-black/15 px-3 py-2 text-sm font-medium dark:border-white/20"
+              copy.selectedPlatform === platform
+                ? "inline-flex min-h-11 flex-1 items-center justify-center rounded-md bg-foreground px-3 text-sm font-medium text-background"
+                : "inline-flex min-h-11 flex-1 items-center justify-center rounded-md border border-black/15 px-3 text-sm font-medium dark:border-white/20"
             }
           >
             {PLATFORM_LABELS[platform]}
@@ -97,55 +56,67 @@ export function CopyListingSection({ item }: CopyListingSectionProps) {
         ))}
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="mt-5">
         <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-md border border-black/15 bg-black/[.03] p-4 font-sans text-sm leading-6 dark:border-white/20 dark:bg-white/[.04]">
-          {listingText}
+          {copy.listingText}
         </pre>
-        <div className="md:min-w-48">
-          <p className="text-sm text-black/60 dark:text-white/60">
-            List price
-          </p>
-          <p className="mt-1 text-xl font-semibold">
-            {formatPrice(item.listPrice)}
-          </p>
-          <p className="mt-1 max-w-48 text-xs text-black/60 dark:text-white/60">
-            Enter this in the platform&apos;s own price field.
-          </p>
-          {selectedPlatform === "EBAY" && (
-            <p className="mt-3 text-xs text-black/60 dark:text-white/60">
-              Title: {title.length}/{EBAY_TITLE_MAX_LENGTH} characters
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs tracking-[0.06em] text-black/60 uppercase dark:text-white/60">
+              List price
             </p>
+            <p className="mt-1 text-xl font-semibold">
+              {formatPrice(item.listPrice)}
+            </p>
+            <p className="mt-1 max-w-52 text-xs text-black/60 dark:text-white/60">
+              Enter this in the platform&apos;s own price field.
+            </p>
+            {copy.selectedPlatform === "EBAY" && (
+              <p className="mt-2 text-xs text-black/60 dark:text-white/60">
+                Title: {copy.title.length}/{EBAY_TITLE_MAX_LENGTH} characters
+              </p>
+            )}
+          </div>
+
+          {showCopyActions && (
+            <div
+              className={`flex-col gap-2 ${
+                hideCopyActionsOnMobile ? "hidden lg:flex" : "flex"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => void copy.copyListing()}
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-foreground px-4 text-sm font-medium text-background"
+              >
+                {copy.copiedTarget === "listing"
+                  ? "Copied"
+                  : "Copy listing"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void copy.copyTitle()}
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-black/15 px-4 text-sm font-medium dark:border-white/20"
+              >
+                {copy.copiedTarget === "title"
+                  ? "Copied"
+                  : "Copy title only"}
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={() => void copyText(listingText, "listing")}
-          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background"
-        >
-          {copiedTarget === "listing" ? "Copied" : "Copy listing"}
-        </button>
-        <button
-          type="button"
-          onClick={() => void copyText(title, "title")}
-          className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium dark:border-white/20"
-        >
-          {copiedTarget === "title" ? "Copied" : "Copy title only"}
-        </button>
-      </div>
-
-      {error !== null && (
+      {copy.error !== null && (
         <div
           role="alert"
           className="mt-4 flex items-start justify-between gap-3 rounded-md border border-red-600/30 bg-red-600/[.06] px-3 py-2 text-sm text-red-700 dark:border-red-400/30 dark:text-red-400"
         >
-          <p>{error}</p>
+          <p>{copy.error}</p>
           <button
             type="button"
-            onClick={() => setError(null)}
-            className="shrink-0 font-medium"
+            onClick={copy.dismissError}
+            className="min-h-11 shrink-0 font-medium"
             aria-label="Dismiss copy error"
           >
             Dismiss
@@ -154,4 +125,17 @@ export function CopyListingSection({ item }: CopyListingSectionProps) {
       )}
     </section>
   );
+}
+
+// Existing item-detail surfaces keep a self-contained copy card, while /new can
+// control the same view so its future mobile action bar shares platform state.
+export function CopyListingSection(props: CopyListingSectionProps) {
+  const copy = useListingCopy(props.item);
+  return <CopyListingSectionView {...props} copy={copy} />;
+}
+
+export function ControlledCopyListingSection(
+  props: ControlledCopyListingSectionProps,
+) {
+  return <CopyListingSectionView {...props} />;
 }

@@ -19,7 +19,7 @@ const CONDITION_PHRASES: Record<string, string> = {
 const NO_FLAW_CONDITIONS = new Set<string>(["new_with_tags", "excellent"]);
 
 export const PLATFORM_LABELS = {
-  FB_MARKETPLACE: "Facebook Marketplace",
+  FB_MARKETPLACE: "Facebook",
   DEPOP: "Depop",
   EBAY: "eBay",
 } satisfies Record<ListingPlatform, string>;

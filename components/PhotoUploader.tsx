@@ -74,6 +74,7 @@ export default function PhotoUploader({
   const [items, setItems] = useState<UploadItem[]>([]);
   const [message, setMessage] = useState<string>();
   const [isDragging, setIsDragging] = useState(false);
+  const [isManaging, setIsManaging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const itemsRef = useRef<UploadItem[]>([]);
@@ -239,6 +240,9 @@ export default function PhotoUploader({
     );
     itemsRef.current = nextItems;
     setItems(nextItems);
+    if (nextItems.length === 0) {
+      setIsManaging(false);
+    }
 
     if (itemToRemove.status === "done" && itemToRemove.url) {
       void fetch("/api/upload", {
@@ -281,39 +285,73 @@ export default function PhotoUploader({
         className="sr-only text-base"
       />
 
-      <div
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        aria-disabled={disabled}
-        onClick={openFilePicker}
-        onKeyDown={handleKeyDown}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`rounded-xl border border-dashed p-8 text-center outline-none transition-colors ${
-          isDragging
-            ? "border-black/50 bg-black/[.04] dark:border-white/60 dark:bg-white/[.06]"
-            : "border-black/15 dark:border-white/20"
-        } ${
-          disabled
-            ? "cursor-not-allowed opacity-60"
-            : "cursor-pointer hover:bg-black/[.04] focus:border-black/40 dark:hover:bg-white/[.06] dark:focus:border-white/50"
-        }`}
-      >
-        <p className="text-sm font-medium">Drop photos here or choose files</p>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          Up to {maxFiles} photos, {formatMegabytes(MAX_FILE_BYTES)} each
-        </p>
-      </div>
+      {(items.length === 0 || isManaging) && (
+        <section
+          className={
+            isManaging
+              ? "rounded-xl border border-black/15 bg-black/[.02] p-4 dark:border-white/20 dark:bg-white/[.02]"
+              : undefined
+          }
+        >
+          {isManaging && (
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base font-semibold">Manage photos</h2>
+                <p className="mt-1 text-xs text-black/60 dark:text-white/60">
+                  The first photo is the cover.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManaging(false)}
+                className="inline-flex min-h-11 items-center rounded-md border border-black/15 px-3 text-sm font-medium dark:border-white/20"
+              >
+                Done
+              </button>
+            </div>
+          )}
 
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => cameraInputRef.current?.click()}
-        className="min-h-11 rounded-md border border-black/15 px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20"
-      >
-        Take photo
-      </button>
+          {items.length < maxFiles && (
+            <div
+              role="button"
+              tabIndex={disabled ? -1 : 0}
+              aria-disabled={disabled}
+              onClick={openFilePicker}
+              onKeyDown={handleKeyDown}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`rounded-xl border border-dashed p-8 text-center outline-none transition-colors ${
+                isDragging
+                  ? "border-black/50 bg-black/[.04] dark:border-white/60 dark:bg-white/[.06]"
+                  : "border-black/15 dark:border-white/20"
+              } ${
+                disabled
+                  ? "cursor-not-allowed opacity-60"
+                  : "cursor-pointer hover:bg-black/[.04] focus:border-black/40 dark:hover:bg-white/[.06] dark:focus:border-white/50"
+              }`}
+            >
+              <p className="text-sm font-medium">
+                Drop photos here or choose files
+              </p>
+              <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                Up to {maxFiles} photos, {formatMegabytes(MAX_FILE_BYTES)} each
+              </p>
+            </div>
+          )}
+
+          {items.length < maxFiles && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => cameraInputRef.current?.click()}
+              className="mt-3 inline-flex min-h-11 items-center rounded-md border border-black/15 px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20"
+            >
+              Take photo
+            </button>
+          )}
+        </section>
+      )}
 
       {message && (
         <div
@@ -332,9 +370,121 @@ export default function PhotoUploader({
         </div>
       )}
 
-      {items.length > 0 && (
+      {items.length > 0 && !isManaging && (
+        <>
+          <section className="hidden rounded-xl border border-black/15 bg-black/[.02] p-3.5 dark:border-white/20 dark:bg-white/[.02] lg:block">
+            <div className="grid grid-cols-3 gap-2">
+              {items.map((item: UploadItem, index: number) => (
+                <div
+                  key={item.id}
+                  className={`relative overflow-hidden rounded-lg border ${
+                    item.status === "error"
+                      ? "border-red-600/50 dark:border-red-400/50"
+                      : "border-black/10 dark:border-white/15"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.previewUrl}
+                    alt={`Preview of ${item.file.name}`}
+                    className="aspect-square w-full object-cover"
+                  />
+                  {index === 0 && (
+                    <span className="absolute left-1.5 top-1.5 rounded bg-foreground px-1.5 py-0.5 text-[10px] font-semibold text-background">
+                      Cover
+                    </span>
+                  )}
+                  {item.status !== "done" && (
+                    <span className="absolute inset-x-0 bottom-0 bg-black/70 px-2 py-1 text-center text-[11px] font-medium text-white">
+                      {item.status === "error"
+                        ? "Upload failed"
+                        : `${item.status}…`}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-2.5 flex items-center justify-between gap-3">
+              <p className="text-xs text-black/60 dark:text-white/60">
+                {items.length} {items.length === 1 ? "photo" : "photos"} · first
+                is the cover
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsManaging(true)}
+                className="inline-flex min-h-11 items-center rounded-md border border-black/15 px-3 text-xs font-medium dark:border-white/20"
+              >
+                Manage
+              </button>
+            </div>
+          </section>
+
+          <section className="lg:hidden">
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2">
+              {items.map((item: UploadItem, index: number) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setIsManaging(true)}
+                  aria-label={`Manage ${item.file.name}${
+                    index === 0 ? ", cover photo" : ""
+                  }`}
+                  className={`relative size-19 shrink-0 overflow-hidden rounded-[10px] border ${
+                    item.status === "error"
+                      ? "border-red-600/50 dark:border-red-400/50"
+                      : "border-black/15 dark:border-white/20"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.previewUrl}
+                    alt=""
+                    className="size-full object-cover"
+                  />
+                  {index === 0 && (
+                    <span className="absolute left-1 top-1 rounded bg-foreground px-1 py-0.5 text-[9px] font-semibold text-background">
+                      Cover
+                    </span>
+                  )}
+                  {item.status !== "done" && (
+                    <span className="absolute inset-x-0 bottom-0 bg-black/70 px-1 py-0.5 text-[10px] font-medium text-white">
+                      {item.status === "error" ? "Failed" : item.status}
+                    </span>
+                  )}
+                </button>
+              ))}
+              {items.length < maxFiles && (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={openFilePicker}
+                  aria-label="Add another photo"
+                  className="inline-flex size-19 shrink-0 items-center justify-center rounded-[10px] border border-dashed border-black/20 text-2xl text-black/50 disabled:opacity-60 dark:border-white/25 dark:text-white/50"
+                >
+                  <span aria-hidden="true">+</span>
+                </button>
+              )}
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-3">
+              <p className="text-xs text-black/60 dark:text-white/60">
+                {items.length} {items.length === 1 ? "photo" : "photos"} · first
+                is the cover
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsManaging(true)}
+                className="inline-flex min-h-11 items-center text-xs font-medium text-black/60 dark:text-white/60"
+              >
+                Manage
+              </button>
+            </div>
+          </section>
+        </>
+      )}
+
+      {items.length > 0 && isManaging && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {items.map((item: UploadItem) => (
+          {items.map((item: UploadItem, index: number) => (
             <div
               key={item.id}
               className="relative overflow-hidden rounded-xl border border-black/15 dark:border-white/20"
@@ -345,6 +495,11 @@ export default function PhotoUploader({
                 alt={`Preview of ${item.file.name}`}
                 className="aspect-square w-full object-cover"
               />
+              {index === 0 && (
+                <span className="absolute left-2 top-2 rounded-md bg-foreground px-2 py-1 text-[11px] font-semibold text-background">
+                  Cover
+                </span>
+              )}
               <div className="space-y-1 border-t border-black/10 p-2 text-xs dark:border-white/15">
                 <p className="truncate font-medium">{item.file.name}</p>
                 {item.status !== "done" && item.status !== "error" && (
@@ -361,7 +516,7 @@ export default function PhotoUploader({
                 disabled={disabled}
                 onClick={() => removeItem(item)}
                 aria-label={`Remove ${item.file.name}`}
-                className="absolute right-2 top-2 rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background disabled:opacity-60"
+                className="absolute right-2 top-2 inline-flex min-h-11 items-center rounded-md bg-foreground px-2 text-xs font-medium text-background disabled:opacity-60"
               >
                 Remove
               </button>

@@ -24,7 +24,11 @@ export default function AppHeader() {
   if (pathname === "/login") return null;
 
   return (
-    <header className="sticky top-0 z-10 border-b border-black/10 bg-background/90 backdrop-blur-sm dark:border-white/15">
+    <header
+      className={`sticky top-0 z-10 border-b border-black/10 bg-background/90 backdrop-blur-sm dark:border-white/15 ${
+        pathname === "/new" ? "hidden lg:block" : ""
+      }`}
+    >
       {/* Tighter padding and cluster gap below sm: at 390px the nav and both buttons
           need every pixel, and anything wider than the viewport scrolls the whole page. */}
       <div className="mx-auto flex h-15 max-w-[1120px] items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6">

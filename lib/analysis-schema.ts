@@ -81,7 +81,7 @@ export const AnalysisSchema = z.object({
   price_reasoning: z
     .string()
     .describe(
-      "Two to four sentences explaining the price: brand desirability, condition, and comparable secondhand sales. Where relevant, note how the price should differ across eBay, Depop, and Facebook Marketplace.",
+      "Exactly two sentences and no more than 45 words total explaining the price using brand desirability, condition, and realistic comparable secondhand sales. When relevant, use the second sentence to explain how pricing differs across eBay, Depop, and Facebook Marketplace.",
     ),
   keywords: z
     .array(z.string())

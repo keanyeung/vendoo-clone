@@ -15,6 +15,11 @@ const money = z
   .refine(hasAtMostTwoDecimals, {
     message: "Amount can have at most 2 decimal places.",
   });
+const requiredPurchaseMoney = z
+  .number({ error: "Purchase price is required." })
+  .refine(hasAtMostTwoDecimals, {
+    message: "Amount can have at most 2 decimal places.",
+  });
 
 export const CreateItemSchema = z
   .object({
@@ -49,7 +54,7 @@ export const CreateItemSchema = z
     listPrice: money.positive({
       message: "List price must be greater than 0.",
     }),
-    purchasePrice: money.nonnegative({
+    purchasePrice: requiredPurchaseMoney.nonnegative({
       message: "Purchase price cannot be negative.",
     }),
     keywords: z.array(z.string()).max(15).default([]),
