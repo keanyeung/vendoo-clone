@@ -115,13 +115,23 @@ The reference HTML is dark-only. Never hardcode its hex values. Use these pairs 
 Verified in the existing source; deviating from these is a review failure.
 
 1. **Server components by default.** The only client component in this whole change is `AppHeader` (D1).
-2. **`new Date()` / `Date.now()` inside a component body trips the `react-hooks/purity` lint rule.** Capture the
-   value once and silence it exactly the way `app/listings/page.tsx:118-120` does:
-   ```ts
-   // Capture one request-time value so every block agrees.
-   // eslint-disable-next-line react-hooks/purity
-   const now = new Date();
-   ```
+2. **Capture the clock once per request**, so every block on a page agrees. Which form you use decides whether
+   you need an eslint-disable — verified empirically, do not guess:
+   - **`Date.now()` IS flagged** by `react-hooks/purity` ("Cannot call impure function during render") and needs
+     the directive, exactly as `app/listings/page.tsx:118-120` does it:
+     ```ts
+     // Capture one request-time value so sorting and the hydrated table agree.
+     // eslint-disable-next-line react-hooks/purity
+     const now = Date.now();
+     ```
+   - **`new Date()` is NOT flagged.** Adding the directive there produces an *"Unused eslint-disable directive"*
+     warning, i.e. it makes lint dirty rather than clean. Write it bare:
+     ```ts
+     // Capture one request-time value so every block on the page agrees.
+     const now = new Date();
+     ```
+   Either way, derive every downstream value from that single capture (`now.getTime()` for helpers that want a
+   timestamp) rather than reading the clock again further down.
 3. **`export const dynamic = "force-dynamic"`** on DB-backed pages. Still valid on Next 16.2.11 here —
    `cacheComponents` is not enabled in `next.config.ts`. Matches `app/listings/page.tsx:14`.
 4. **Images:** plain `<img>` preceded by `{/* eslint-disable-next-line @next/next/no-img-element */}`. Remote
