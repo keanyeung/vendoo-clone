@@ -138,36 +138,13 @@ export default async function ListingsPage(props: {
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 p-6">
-      <Link
-        href="/"
-        className="inline-block text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
-      >
-        ← Back to home
-      </Link>
-
-      <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Listings</h1>
-          <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-            {filtersActive
-              ? `${itemDtos.length} of ${totalItems} items`
-              : `${itemDtos.length} ${itemDtos.length === 1 ? "item" : "items"}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 self-start">
-          <Link
-            href="/new"
-            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background"
-          >
-            New Listing
-          </Link>
-          <Link
-            href="/analytics"
-            className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
-          >
-            Analytics
-          </Link>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Listings</h1>
+        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+          {filtersActive
+            ? `${itemDtos.length} of ${totalItems} items`
+            : `${itemDtos.length} ${itemDtos.length === 1 ? "item" : "items"}`}
+        </p>
       </div>
 
       <ListingsFilterBar status={status} q={q} sort={sort} view={view} />

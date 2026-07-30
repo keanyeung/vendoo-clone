@@ -51,14 +51,7 @@ export default async function AnalyticsPage(
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 p-6">
-      <Link
-        href="/"
-        className="inline-block text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
-      >
-        ← Back to home
-      </Link>
-
-      <div className="mt-2">
+      <div>
         <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
         <p className="mt-1 text-sm text-black/60 dark:text-white/60">
           {allTimeSalesCount}{" "}

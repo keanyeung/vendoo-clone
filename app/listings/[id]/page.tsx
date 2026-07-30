@@ -102,7 +102,7 @@ export default async function ItemDetailPage(
       <header className="space-y-3">
         <Link
           href="/listings"
-          className="inline-block text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
+          className="inline-flex min-h-11 items-center text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
         >
           ← Back to listings
         </Link>

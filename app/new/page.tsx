@@ -130,9 +130,6 @@ export default function NewListingPage() {
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 p-6">
       <div className="space-y-2">
-        <Link href="/" className="inline-block text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white">
-          ← Back to home
-        </Link>
         <h1 className="text-2xl font-semibold tracking-tight">New Listing</h1>
         <p className="text-sm text-black/60 dark:text-white/60">
           Step one: add photos of the item you want to list.
