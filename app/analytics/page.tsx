@@ -1,14 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import AnalyticsRangeToggle from "@/components/AnalyticsRangeToggle";
-import ProfitChart from "@/components/ProfitChart";
-import {
-  computeAnalytics,
-  isAnalyticsRange,
-  type AnalyticsRange,
-} from "@/lib/analytics";
-import { prisma } from "@/lib/db";
-import { toItemDtos } from "@/lib/item-dto";
+import KpiCards from "@/components/analytics/KpiCards";
+import ProfitChart from "@/components/analytics/ProfitChart";
+import RangeToggle from "@/components/analytics/RangeToggle";
+import SoldItemsTable from "@/components/analytics/SoldItemsTable";
+import { isSalesRange, type SalesRange } from "@/lib/analytics";
+import { loadSalesView } from "@/lib/queries/sales";
+import { formatRangeSubline } from "@/lib/sales-format";
 
 // This database-backed page must render fresh on every request, not with stale build-time data.
 export const dynamic = "force-dynamic";
@@ -17,11 +15,6 @@ export const metadata: Metadata = {
   title: "Analytics",
 };
 
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
 function firstSearchParam(
   value: string | string[] | undefined,
 ): string {
@@ -29,39 +22,35 @@ function firstSearchParam(
   return value ?? "";
 }
 
-function formatPercentage(value: number | null): string {
-  return value === null ? "—" : `${value.toFixed(1)}%`;
-}
-
 export default async function AnalyticsPage(
   props: PageProps<"/analytics">,
 ) {
+  // Capture one request-time value so the header, range bounds, and every child agree.
+  const now = new Date();
   const searchParams = await props.searchParams;
   const rangeParam = firstSearchParam(searchParams.range);
-  const range: AnalyticsRange = isAnalyticsRange(rangeParam)
-    ? rangeParam
-    : "all";
-
-  const items = await prisma.item.findMany({
-    where: { status: "SOLD" },
+  const range: SalesRange = isSalesRange(rangeParam) ? rangeParam : "month";
+  const view = await loadSalesView(range, now);
+  const subline = formatRangeSubline({
+    range: view.range,
+    bounds: view.bounds,
+    count: view.summary.count,
+    earliestSoldAt: view.earliestSoldAt,
   });
-  const dtos = toItemDtos(items);
-  const summary = computeAnalytics(dtos, range, new Date());
-  const allTimeSalesCount = dtos.length;
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          {allTimeSalesCount}{" "}
-          {allTimeSalesCount === 1 ? "sale" : "sales"} all time
-        </p>
+    <main className="mx-auto w-full max-w-[1120px] flex-1 px-6 pt-8 pb-16">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[26px] font-semibold tracking-tight">Analytics</h1>
+          <p className="mt-1.5 text-sm text-black/60 dark:text-white/60">
+            {subline}
+          </p>
+        </div>
+        <RangeToggle range={view.range} />
       </div>
 
-      <AnalyticsRangeToggle range={range} />
-
-      {dtos.length === 0 ? (
+      {view.earliestSoldAt === null ? (
         <section className="mt-8 rounded-xl border border-black/15 px-6 py-12 text-center dark:border-white/20">
           <h2 className="text-lg font-semibold">No sales recorded yet</h2>
           <p className="mt-2 text-sm text-black/60 dark:text-white/60">
@@ -75,101 +64,29 @@ export default async function AnalyticsPage(
             Go to listings
           </Link>
         </section>
-      ) : summary.itemsSold === 0 ? (
-        <section className="mt-8 rounded-xl border border-black/15 px-6 py-12 text-center dark:border-white/20">
-          <h2 className="text-lg font-semibold">No sales in this period.</h2>
-          <p className="mt-2 text-sm text-black/60 dark:text-white/60">
-            Switch to All time to see your complete sales history.
-          </p>
-        </section>
       ) : (
-        <section className="mt-8">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <div className="rounded-xl border border-black/15 p-4 dark:border-white/20">
-              <p className="text-xs font-medium uppercase tracking-wide text-black/60 dark:text-white/60">
-                Total profit
-              </p>
-              <p
-                className={`mt-2 text-2xl font-semibold ${
-                  summary.totalProfit >= 0
-                    ? "text-green-700 dark:text-green-400"
-                    : "text-red-700 dark:text-red-400"
-                }`}
-              >
-                {currencyFormatter.format(summary.totalProfit)}
-              </p>
-              {range !== "all" && (
-                <p className="mt-1 text-xs text-black/60 dark:text-white/60">
-                  {currencyFormatter.format(summary.allTimeProfit)} all time
-                </p>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-black/15 p-4 dark:border-white/20">
-              <p className="text-xs font-medium uppercase tracking-wide text-black/60 dark:text-white/60">
-                Revenue
-              </p>
-              <p className="mt-2 text-2xl font-semibold">
-                {currencyFormatter.format(summary.totalRevenue)}
-              </p>
-              <p className="mt-1 text-xs text-black/60 dark:text-white/60">
-                − {currencyFormatter.format(summary.totalCogs)} cost · −{" "}
-                {currencyFormatter.format(summary.totalFees)} fees
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-black/15 p-4 dark:border-white/20">
-              <p className="text-xs font-medium uppercase tracking-wide text-black/60 dark:text-white/60">
-                Avg profit / item
-              </p>
-              <p className="mt-2 text-2xl font-semibold">
-                {summary.avgProfitPerItem === null
-                  ? "—"
-                  : currencyFormatter.format(summary.avgProfitPerItem)}
-              </p>
-              <p className="mt-1 text-xs text-black/60 dark:text-white/60">
-                across {summary.itemsSold}{" "}
-                {summary.itemsSold === 1 ? "item" : "items"}
-              </p>
-            </div>
-
-            {/* These are ratios of totals, computed in lib/analytics. */}
-            <div className="rounded-xl border border-black/15 p-4 dark:border-white/20">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-black/60 dark:text-white/60">
-                  Overall margin
-                </p>
-                <p className="mt-1 text-xl font-semibold">
-                  {formatPercentage(summary.overallMarginPct)}
-                </p>
-                {summary.overallMarginPct === null && (
-                  <p className="text-xs text-black/60 dark:text-white/60">
-                    no revenue
-                  </p>
-                )}
-              </div>
-              <div className="mt-4 border-t border-black/10 pt-4 dark:border-white/15">
-                <p className="text-xs font-medium uppercase tracking-wide text-black/60 dark:text-white/60">
-                  Overall ROI
-                </p>
-                <p className="mt-1 text-xl font-semibold">
-                  {formatPercentage(summary.overallRoiPct)}
-                </p>
-                {summary.overallRoiPct === null && (
-                  <p className="text-xs text-black/60 dark:text-white/60">
-                    no cost basis
-                  </p>
-                )}
-              </div>
-            </div>
+        <>
+          <div className="mt-6">
+            <KpiCards
+              summary={view.summary}
+              previousSummary={view.previousSummary}
+              platforms={view.platforms}
+              range={view.range}
+              earliestSoldAt={view.earliestSoldAt}
+            />
           </div>
-
-          <p className="mt-3 text-sm text-black/60 dark:text-white/60">
-            Profit is net of purchase cost and platform fees.
-          </p>
-
-          <ProfitChart monthly={summary.monthly} />
-        </section>
+          <div className="mt-3">
+            <ProfitChart
+              sales={view.sales}
+              bounds={view.bounds}
+              range={view.range}
+              defaultGranularity={view.defaultGranularity}
+            />
+          </div>
+          <div className="mt-3">
+            <SoldItemsTable sales={view.sales} range={view.range} />
+          </div>
+        </>
       )}
     </main>
   );
