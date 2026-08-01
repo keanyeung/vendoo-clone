@@ -1,7 +1,10 @@
 import {
   computeAnalytics,
   computeProfit,
-  filterSoldByRange,
+  filterSales,
+  rangeBounds,
+  summarize,
+  toSales,
 } from "@/lib/analytics";
 import type { MonthlyBucket } from "@/lib/analytics";
 import type { ItemDto } from "@/lib/item-dto";
@@ -175,24 +178,16 @@ export function computeDashboard(
   now: Date,
 ): DashboardSummary {
   const nowMs = now.getTime();
-  const monthSales = filterSoldByRange(items, "month", now);
-  const yearSales = filterSoldByRange(items, "year", now);
+  const sales = toSales(items);
+  // Month-to-date keeps the homepage aligned with /analytics: a forward-dated sale is almost always a data-entry error, not earned revenue.
+  const monthSales = filterSales(sales, rangeBounds("month", now, null));
+  const yearSales = filterSales(sales, rangeBounds("year", now, null));
+  const monthSummary = summarize(monthSales);
+  const yearSummary = summarize(yearSales);
   const soldItems = items.filter((item: ItemDto) => item.status === "SOLD");
   // One all-time roll-up, reused, so the homepage can never disagree with /analytics.
   const allTime = computeAnalytics(items, "all", now);
   const monthly = allTime.monthly.slice(-6);
-
-  let revenueThisMonth = 0;
-  let profitThisMonth = 0;
-  for (const item of monthSales) {
-    revenueThisMonth += item.soldPrice ?? 0;
-    profitThisMonth += computeProfit(item) ?? 0;
-  }
-
-  let revenueYtd = 0;
-  for (const item of yearSales) {
-    revenueYtd += item.soldPrice ?? 0;
-  }
 
   let activeListings = 0;
   let draftCount = 0;
@@ -227,14 +222,11 @@ export function computeDashboard(
 
   // Round returned values once, after accumulation, to avoid compounding drift.
   return {
-    revenueThisMonth: round(revenueThisMonth, 2),
-    profitThisMonth: round(profitThisMonth, 2),
-    salesThisMonth: monthSales.length,
-    revenueYtd: round(revenueYtd, 2),
-    marginThisMonthPct:
-      revenueThisMonth === 0
-        ? null
-        : round((profitThisMonth / revenueThisMonth) * 100, 1),
+    revenueThisMonth: monthSummary.revenue,
+    profitThisMonth: monthSummary.profit,
+    salesThisMonth: monthSummary.count,
+    revenueYtd: yearSummary.revenue,
+    marginThisMonthPct: monthSummary.marginPct,
     activeListings,
     draftCount,
     soldCount,
