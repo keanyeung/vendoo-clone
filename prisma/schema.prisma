@@ -67,9 +67,25 @@ model Item {
   soldDate     DateTime?
   platformFees Decimal?  @default(0) @db.Decimal(10, 2)
 
+  postings ItemPosting[]
+
   @@index([status])
   @@index([status, updatedAt])
   @@index([createdAt])
+}
+
+// One row per marketplace an item has been posted to. Created out-of-band
+// before this model was tracked in the schema, so the shape here mirrors the
+// live table exactly; S15 extends it with the listing url and a removal date.
+model ItemPosting {
+  id       String   @id @default(cuid())
+  itemId   String
+  item     Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  platform Platform
+  postedAt DateTime @default(now())
+
+  @@unique([itemId, platform])
+  @@index([itemId])
 }
 
 // One row per failed login attempt, used to rate-limit password guessing.
