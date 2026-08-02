@@ -8,13 +8,14 @@ import {
 } from "./listing-context";
 
 describe("listing context", () => {
-  it("normalizes the four supported listing parameters", () => {
+  it("normalizes the five supported listing parameters", () => {
     expect(
       parseListingContext({
         status: "LISTED",
         q: "  wool coat  ",
         sort: "oldest",
         view: "table",
+        page: "3",
         ignored: "value",
       }),
     ).toEqual({
@@ -22,6 +23,7 @@ describe("listing context", () => {
       q: "wool coat",
       sort: "added-asc",
       view: "table",
+      page: 3,
     });
   });
 
@@ -29,21 +31,22 @@ describe("listing context", () => {
     expect(
       parseListingContext({
         saved: "1",
-        from: "status=LISTED&q=linen+shirt&sort=days-desc&view=table",
+        from: "status=LISTED&q=linen+shirt&sort=days-desc&view=table&page=4",
       }),
     ).toEqual({
       status: "LISTED",
       q: "linen shirt",
       sort: "days-desc",
       view: "table",
+      page: 4,
     });
     expect(
       buildListingsHref({
         saved: "1",
-        from: "status=LISTED&q=linen+shirt&sort=days-desc&view=table",
+        from: "status=LISTED&q=linen+shirt&sort=days-desc&view=table&page=4",
       }),
     ).toBe(
-      "/listings?status=LISTED&q=linen+shirt&sort=days-desc&view=table",
+      "/listings?status=LISTED&q=linen+shirt&sort=days-desc&view=table&page=4",
     );
   });
 
@@ -54,8 +57,11 @@ describe("listing context", () => {
         q: "linen shirt",
         sort: "days-desc",
         view: "grid",
+        page: 2,
       }),
-    ).toBe("/listings?status=LISTED&q=linen+shirt&sort=days-desc");
+    ).toBe(
+      "/listings?status=LISTED&q=linen+shirt&sort=days-desc&page=2",
+    );
 
     expect(
       buildListingsHref({
@@ -63,6 +69,7 @@ describe("listing context", () => {
         q: "",
         sort: "newest",
         view: "grid",
+        page: 1,
       }),
     ).toBe("/listings");
   });
@@ -74,9 +81,10 @@ describe("listing context", () => {
         q: "",
         sort: "days-desc",
         view: "grid",
+        page: 4,
       }),
     ).toBe(
-      "/listings/item-1?from=status%3DLISTED%26sort%3Ddays-desc",
+      "/listings/item-1?from=status%3DLISTED%26sort%3Ddays-desc%26page%3D4",
     );
   });
 
@@ -90,6 +98,7 @@ describe("listing context", () => {
       q: "boots",
       sort: "soldDate-asc",
       view: "table",
+      page: 1,
       sortToken: { field: "soldDate", dir: "asc" },
       where: {
         status: "SOLD",
@@ -109,6 +118,7 @@ describe("listing context", () => {
         q: "   ",
         sort: "not-a-sort",
         view: "cards",
+        page: "-7",
       }),
     ).toBe("/listings");
   });

@@ -1,6 +1,18 @@
 import type { ItemDto } from "@/lib/item-dto";
 
-// Sorting stays in memory because the page already fetches every row, and computed columns such as days listed (and later profit) cannot be expressed with Prisma orderBy.
+// Sorting stays in memory because computed columns such as days listed (and
+// later profit) cannot be expressed with Prisma orderBy.
+type SortableItem = Pick<
+  ItemDto,
+  | "id"
+  | "createdAt"
+  | "listPrice"
+  | "soldPrice"
+  | "soldDate"
+  | "status"
+  | "title"
+>;
+
 export type SortDir = "asc" | "desc";
 export type SortField =
   | "added"
@@ -75,7 +87,9 @@ export function serializeSort(token: SortToken): string {
 }
 
 // Whole days an item has been listed: from createdAt to soldDate (if sold) or now.
-export function daysListed(item: ItemDto, now: number = Date.now()): number {
+export function daysListed<
+  T extends Pick<SortableItem, "createdAt" | "soldDate">,
+>(item: T, now: number = Date.now()): number {
   const endMs = item.soldDate ? Date.parse(item.soldDate) : now;
   return Math.max(
     0,
@@ -83,19 +97,19 @@ export function daysListed(item: ItemDto, now: number = Date.now()): number {
   );
 }
 
-export function sortItems(
-  items: ItemDto[],
+export function sortItems<T extends SortableItem>(
+  items: T[],
   token: SortToken,
   now: number = Date.now(),
-): ItemDto[] {
-  const statusRanks: Record<ItemDto["status"], number> = {
+): T[] {
+  const statusRanks: Record<SortableItem["status"], number> = {
     DRAFT: 0,
     LISTED: 1,
     SOLD: 2,
   };
   const ascendingComparators: Record<
     SortField,
-    (a: ItemDto, b: ItemDto) => number
+    (a: T, b: T) => number
   > = {
     added: (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
     price: (a, b) => a.listPrice - b.listPrice,

@@ -1,5 +1,6 @@
 import type { ItemStatus, Prisma } from "@prisma/client";
 
+import { parsePage } from "./listing-page";
 import {
   DEFAULT_SORT,
   parseSort,
@@ -16,6 +17,7 @@ export type ListingContext = {
   q: string;
   sort: string;
   view: "grid" | "table";
+  page: number;
 };
 
 export type ListingContextInput =
@@ -35,9 +37,9 @@ function readParam(source: ListingContextInput, key: string): string {
     return source.get(key) ?? "";
   }
 
-  const value = (source as SearchParamRecord)[key];
+  const value = (source as Record<string, SearchParamValue | number>)[key];
   if (Array.isArray(value)) return value[0] ?? "";
-  return value ?? "";
+  return value === undefined ? "" : String(value);
 }
 
 function isItemStatus(value: string): value is ItemStatus {
@@ -53,6 +55,7 @@ function parseDirectContext(source: ListingContextInput): ListingContext {
     q: readParam(source, "q").trim(),
     sort: serializeSort(parseSort(rawSort)),
     view: readParam(source, "view") === "table" ? "table" : "grid",
+    page: parsePage(readParam(source, "page")),
   };
 }
 
@@ -73,6 +76,7 @@ export function buildListingsHref(params: ListingContextInput): string {
   if (context.q) query.set("q", context.q);
   if (context.sort !== DEFAULT_SORT_VALUE) query.set("sort", context.sort);
   if (context.view === "table") query.set("view", context.view);
+  if (context.page > 1) query.set("page", String(context.page));
 
   const serialized = query.toString();
   return serialized ? `/listings?${serialized}` : "/listings";

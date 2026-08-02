@@ -10,7 +10,6 @@ import { ListingSavedToast } from "@/components/item/ListingSavedToast";
 import { PricePanel } from "@/components/item/PricePanel";
 import { SaleSummary } from "@/components/item/SaleSummary";
 import { prisma } from "@/lib/db";
-import type { ItemDto } from "@/lib/item-dto";
 import { toItemDto } from "@/lib/item-dto";
 import {
   buildListingQuery,
@@ -115,7 +114,7 @@ export default async function ItemDetailPage(
               row.soldDate === null ? null : row.soldDate.toISOString(),
             status: row.status,
             title: row.title,
-          })) as ItemDto[],
+          })),
           listingQuery.sortToken,
           now,
         ).map((row) => row.id);
