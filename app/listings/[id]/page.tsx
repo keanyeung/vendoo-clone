@@ -87,11 +87,6 @@ export default async function ItemDetailPage(
 
             <section className="mt-8 rounded-xl border border-black/15 p-6 dark:border-white/20">
               <h2 className="text-lg font-semibold">Listing content</h2>
-              {itemDto.summary !== null && (
-                <p className="mt-2 text-black/70 italic dark:text-white/70">
-                  {itemDto.summary}
-                </p>
-              )}
               <p className="mt-4 whitespace-pre-line leading-7">
                 {itemDto.description}
               </p>
