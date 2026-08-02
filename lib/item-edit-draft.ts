@@ -36,6 +36,12 @@ export type RemovedDraftPhoto = {
   index: number;
 };
 
+export type PhotoCollectionState = {
+  photos: DraftPhoto[];
+  lastRemoval: RemovedDraftPhoto | null;
+  uploadedDraftUrls: string[];
+};
+
 export type ItemEditDraftState = {
   originalFields: ItemDraftFields;
   originalPhotos: DraftPhoto[];
@@ -45,6 +51,16 @@ export type ItemEditDraftState = {
   uploadedDraftUrls: string[];
 };
 
+export type PhotoCollectionAction =
+  | { type: "photos_replaced"; urls: string[] }
+  | { type: "photos_added"; photos: DraftPhoto[] }
+  | { type: "photo_upload_started"; photoId: string }
+  | { type: "photo_upload_succeeded"; photoId: string; url: string }
+  | { type: "photo_upload_failed"; photoId: string; error: string }
+  | { type: "photo_removed"; photoId: string }
+  | { type: "photo_removal_undone" }
+  | { type: "photo_moved"; photoId: string; toIndex: number };
+
 export type ItemEditDraftAction =
   | { type: "fields_replaced"; fields: ItemDraftFields }
   | {
@@ -52,13 +68,7 @@ export type ItemEditDraftAction =
       field: keyof ItemDraftFields;
       value: ItemDraftFields[keyof ItemDraftFields];
     }
-  | { type: "photos_added"; photos: DraftPhoto[] }
-  | { type: "photo_upload_started"; photoId: string }
-  | { type: "photo_upload_succeeded"; photoId: string; url: string }
-  | { type: "photo_upload_failed"; photoId: string; error: string }
-  | { type: "photo_removed"; photoId: string }
-  | { type: "photo_removal_undone" }
-  | { type: "photo_moved"; photoId: string; toIndex: number }
+  | PhotoCollectionAction
   | { type: "discarded" }
   | { type: "saved" };
 
@@ -86,6 +96,16 @@ function existingPhoto(url: string, index: number): DraftPhoto {
     origin: "existing",
     status: "ready",
     error: null,
+  };
+}
+
+export function createPhotoCollectionState(
+  initialUrls: string[],
+): PhotoCollectionState {
+  return {
+    photos: initialUrls.map(existingPhoto),
+    lastRemoval: null,
+    uploadedDraftUrls: [],
   };
 }
 
@@ -194,15 +214,13 @@ export function buildEditDraftItemDto(
 
 export function createItemEditDraftState(item: ItemDto): ItemEditDraftState {
   const fields = createItemDraftFields(item);
-  const photos = item.photos.map(existingPhoto);
+  const photoCollection = createPhotoCollectionState(item.photos);
 
   return {
     originalFields: cloneFields(fields),
-    originalPhotos: clonePhotos(photos),
+    originalPhotos: clonePhotos(photoCollection.photos),
     fields,
-    photos,
-    lastRemoval: null,
-    uploadedDraftUrls: [],
+    ...photoCollection,
   };
 }
 
@@ -215,10 +233,10 @@ function updatePhoto(
 }
 
 function updatePhotoEverywhere(
-  state: ItemEditDraftState,
+  state: PhotoCollectionState,
   photoId: string,
   update: Partial<DraftPhoto>,
-): Pick<ItemEditDraftState, "photos" | "lastRemoval"> {
+): Pick<PhotoCollectionState, "photos" | "lastRemoval"> {
   return {
     photos: state.photos.map((photo: DraftPhoto): DraftPhoto =>
       updatePhoto(photo, photoId, update),
@@ -233,41 +251,13 @@ function updatePhotoEverywhere(
   };
 }
 
-function movePhoto(
-  photos: DraftPhoto[],
-  photoId: string,
-  toIndex: number,
-): DraftPhoto[] {
-  const fromIndex = photos.findIndex(
-    (photo: DraftPhoto): boolean => photo.id === photoId,
-  );
-  if (fromIndex === -1 || photos.length < 2) return photos;
-
-  const targetIndex = Math.max(0, Math.min(toIndex, photos.length - 1));
-  if (fromIndex === targetIndex) return photos;
-
-  const next = [...photos];
-  const [moved] = next.splice(fromIndex, 1);
-  if (moved === undefined) return photos;
-  next.splice(targetIndex, 0, moved);
-  return next;
-}
-
-export function itemEditDraftReducer(
-  state: ItemEditDraftState,
-  action: ItemEditDraftAction,
-): ItemEditDraftState {
+export function photoCollectionReducer(
+  state: PhotoCollectionState,
+  action: PhotoCollectionAction,
+): PhotoCollectionState {
   switch (action.type) {
-    case "fields_replaced":
-      return { ...state, fields: cloneFields(action.fields) };
-    case "field_changed":
-      return {
-        ...state,
-        fields: {
-          ...state.fields,
-          [action.field]: action.value,
-        } as ItemDraftFields,
-      };
+    case "photos_replaced":
+      return createPhotoCollectionState(action.urls);
     case "photos_added": {
       const knownIds = new Set(
         state.photos.map((photo: DraftPhoto): string => photo.id),
@@ -339,6 +329,44 @@ export function itemEditDraftReducer(
         ...state,
         photos: movePhoto(state.photos, action.photoId, action.toIndex),
       };
+  }
+}
+
+function movePhoto(
+  photos: DraftPhoto[],
+  photoId: string,
+  toIndex: number,
+): DraftPhoto[] {
+  const fromIndex = photos.findIndex(
+    (photo: DraftPhoto): boolean => photo.id === photoId,
+  );
+  if (fromIndex === -1 || photos.length < 2) return photos;
+
+  const targetIndex = Math.max(0, Math.min(toIndex, photos.length - 1));
+  if (fromIndex === targetIndex) return photos;
+
+  const next = [...photos];
+  const [moved] = next.splice(fromIndex, 1);
+  if (moved === undefined) return photos;
+  next.splice(targetIndex, 0, moved);
+  return next;
+}
+
+export function itemEditDraftReducer(
+  state: ItemEditDraftState,
+  action: ItemEditDraftAction,
+): ItemEditDraftState {
+  switch (action.type) {
+    case "fields_replaced":
+      return { ...state, fields: cloneFields(action.fields) };
+    case "field_changed":
+      return {
+        ...state,
+        fields: {
+          ...state.fields,
+          [action.field]: action.value,
+        } as ItemDraftFields,
+      };
     case "discarded":
       return {
         ...state,
@@ -363,6 +391,8 @@ export function itemEditDraftReducer(
         uploadedDraftUrls: [],
       };
     }
+    default:
+      return { ...state, ...photoCollectionReducer(state, action) };
   }
 }
 
@@ -395,7 +425,7 @@ export function getDraftChangeSummary(state: ItemEditDraftState): string {
 }
 
 export function getSavablePhotoUrls(
-  state: ItemEditDraftState,
+  state: PhotoCollectionState,
 ): string[] | null {
   if (state.photos.length === 0) return null;
 

@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ControlledCopyListingSection } from "@/components/CopyListingSection";
 import ItemForm from "@/components/ItemForm";
-import PhotoUploader from "@/components/PhotoUploader";
+import { PhotoManager } from "@/components/item/PhotoManager";
 import { useListingCopy } from "@/components/useListingCopy";
 import { computeProfit, computeRoi } from "@/lib/analytics";
 import type { Analysis } from "@/lib/analysis-schema";
@@ -19,6 +19,7 @@ import type { ItemDto } from "@/lib/item-dto";
 import { CreateItemSchema } from "@/lib/item-schema";
 import { formatUsageLine } from "@/lib/model-pricing";
 import { STATUS_STYLES } from "@/lib/status-style";
+import { usePhotoCollection } from "@/lib/usePhotoCollection";
 
 type AnalysisUsage = {
   inputTokens: number;
@@ -49,13 +50,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export default function NewListingPage() {
-  const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
+  const photoCollection = usePhotoCollection([]);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [usage, setUsage] = useState<AnalysisUsage | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [analysisKey, setAnalysisKey] = useState<number>(0);
-  const [uploaderKey, setUploaderKey] = useState<number>(0);
   const [draft, setDraft] = useState<ItemDraft | null>(null);
   const [savedItem, setSavedItem] = useState<ItemDto | null>(null);
   const [listedTodayCount, setListedTodayCount] = useState<number | null>(null);
@@ -64,7 +64,12 @@ export default function NewListingPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const uploadedUrlsKeyRef = useRef<string>(JSON.stringify([]));
   const listedTodayRequestRef = useRef(0);
-  const hasPhotos = uploadedUrls.length > 0;
+  const readyPhotoUrls = photoCollection.photos.flatMap(
+    (photo): string[] =>
+      photo.status === "ready" && photo.url !== null ? [photo.url] : [],
+  );
+  const readyPhotoUrlsKey = JSON.stringify(readyPhotoUrls);
+  const hasPhotos = readyPhotoUrls.length > 0;
   const hasAnalysis = analysis !== null && draft !== null;
   const purchasePriceValue =
     draft === null || draft.purchasePrice.trim() === ""
@@ -83,24 +88,29 @@ export default function NewListingPage() {
         );
   const copyItem = savedItem ?? previewItem;
   const listingCopy = useListingCopy(copyItem);
+  const listingCopyResetRef = useRef(listingCopy.reset);
   const usageLine = usage === null ? null : formatUsageLine(usage);
 
-  function handleUploadedUrlsChange(urls: string[]): void {
-    const nextKey = JSON.stringify(urls);
-    if (uploadedUrlsKeyRef.current === nextKey) return;
-    uploadedUrlsKeyRef.current = nextKey;
-    setUploadedUrls(urls);
+  useEffect((): void => {
+    listingCopyResetRef.current = listingCopy.reset;
+  }, [listingCopy.reset]);
+
+  useEffect((): void => {
+    if (uploadedUrlsKeyRef.current === readyPhotoUrlsKey) return;
+    uploadedUrlsKeyRef.current = readyPhotoUrlsKey;
     setAnalysis(null);
     setDraft(null);
     setUsage(null);
     setErrorMessage(null);
     setIsAnalyzing(false);
-    listingCopy.reset();
-  }
+    listingCopyResetRef.current();
+  }, [readyPhotoUrlsKey]);
 
   async function handleAnalyze(): Promise<void> {
-    if (uploadedUrls.length === 0 || isAnalyzing) return;
-    const requestedUrlsKey = uploadedUrlsKeyRef.current;
+    if (readyPhotoUrls.length === 0 || isAnalyzing) return;
+    const requestedUrls = [...readyPhotoUrls];
+    const requestedUrlsKey = JSON.stringify(requestedUrls);
+    uploadedUrlsKeyRef.current = requestedUrlsKey;
     setErrorMessage(null);
     setAnalysis(null);
     setUsage(null);
@@ -110,7 +120,7 @@ export default function NewListingPage() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photoUrls: uploadedUrls }),
+        body: JSON.stringify({ photoUrls: requestedUrls }),
       });
       let body: unknown;
       try {
@@ -149,7 +159,7 @@ export default function NewListingPage() {
       if (uploadedUrlsKeyRef.current === requestedUrlsKey) {
         const result = body as AnalyzeResponse;
         setAnalysis(result.analysis);
-        setDraft(createItemDraft(result.analysis, uploadedUrls));
+        setDraft(createItemDraft(result.analysis, requestedUrls));
         listingCopy.reset();
         setUsage(result.usage);
         setAnalysisKey((current: number): number => current + 1);
@@ -222,9 +232,18 @@ export default function NewListingPage() {
 
   async function handleSave(status: DraftItemStatus): Promise<void> {
     if (draft === null || isSaving) return;
+    if (photoCollection.savablePhotoUrls === null) {
+      setFieldErrors({
+        photos: "Wait for every photo to finish uploading before saving.",
+      });
+      return;
+    }
 
     const parsed = CreateItemSchema.safeParse(
-      buildCreateItemInput(draft, status),
+      buildCreateItemInput(
+        { ...draft, photos: photoCollection.savablePhotoUrls },
+        status,
+      ),
     );
     if (!parsed.success) {
       const next: FieldErrors = {};
@@ -286,13 +305,12 @@ export default function NewListingPage() {
     setDraft(null);
     setUsage(null);
     setErrorMessage(null);
-    setUploadedUrls([]);
     setIsAnalyzing(false);
     setIsSaving(false);
     setFieldErrors({});
     setSubmitError(null);
     uploadedUrlsKeyRef.current = JSON.stringify([]);
-    setUploaderKey((current: number): number => current + 1);
+    photoCollection.reset();
   }
 
   if (!savedItem) {
@@ -376,10 +394,34 @@ export default function NewListingPage() {
             }`}
           >
             <div className="flex min-w-0 flex-col gap-4 lg:self-stretch">
-              <PhotoUploader
-                key={uploaderKey}
-                onChange={handleUploadedUrlsChange}
+              <PhotoManager
+                photos={photoCollection.photos}
+                lastRemoval={photoCollection.lastRemoval}
+                reuploadOnUndo
+                onAddPhotos={photoCollection.addPhotos}
+                onUploadStarted={photoCollection.markPhotoUploadStarted}
+                onUploadSucceeded={photoCollection.markPhotoUploadSucceeded}
+                onUploadFailed={photoCollection.markPhotoUploadFailed}
+                onRemovePhoto={photoCollection.removePhoto}
+                onUndoRemove={photoCollection.undoPhotoRemoval}
+                onMovePhoto={photoCollection.movePhoto}
+                onSetCover={photoCollection.setCover}
               />
+              {photoCollection.cleanupError !== null && (
+                <div
+                  role="alert"
+                  className="flex items-start justify-between gap-3 rounded-md border border-red-600/30 bg-red-600/[.06] px-3 py-2 text-sm text-red-700 dark:border-red-400/30 dark:text-red-400"
+                >
+                  <p>{photoCollection.cleanupError}</p>
+                  <button
+                    type="button"
+                    onClick={photoCollection.dismissCleanupError}
+                    className="min-h-11 shrink-0 font-medium"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
               {analysis && draft && previewItem && (
                 <ControlledCopyListingSection
                   item={previewItem}
@@ -389,13 +431,13 @@ export default function NewListingPage() {
                 />
               )}
 
-              {uploadedUrls.length > 0 && !hasAnalysis && (
+              {readyPhotoUrls.length > 0 && !hasAnalysis && (
                 <section className="space-y-4">
                   <button
                     type="button"
                     disabled={isAnalyzing}
                     onClick={() => void handleAnalyze()}
-                    className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
+                    className="min-h-11 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Analyze photos
                   </button>
@@ -405,8 +447,8 @@ export default function NewListingPage() {
                       className="rounded-xl border border-black/15 bg-black/[.03] p-4 dark:border-white/20 dark:bg-white/[.04]"
                     >
                       <p className="font-medium">
-                        Analyzing {uploadedUrls.length}{" "}
-                        {uploadedUrls.length === 1 ? "photo" : "photos"}…
+                        Analyzing {readyPhotoUrls.length}{" "}
+                        {readyPhotoUrls.length === 1 ? "photo" : "photos"}…
                       </p>
                       <p className="mt-1 text-sm text-black/60 dark:text-white/60">
                         This usually takes 15–30 seconds. You can keep this page

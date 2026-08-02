@@ -28,6 +28,7 @@ type PhotoManagerProps = {
   lastRemoval: RemovedDraftPhoto | null;
   disabled?: boolean;
   maxFiles?: number;
+  reuploadOnUndo?: boolean;
   onAddPhotos: (photos: DraftPhoto[]) => void;
   onUploadStarted: (photoId: string) => void;
   onUploadSucceeded: (photoId: string, url: string) => void;
@@ -81,6 +82,7 @@ export function PhotoManager({
   lastRemoval,
   disabled = false,
   maxFiles = MAX_FILES,
+  reuploadOnUndo = false,
   onAddPhotos,
   onUploadStarted,
   onUploadSucceeded,
@@ -169,7 +171,7 @@ export function PhotoManager({
         throw new Error("The upload completed without returning a photo URL.");
       }
 
-      fileByPhotoIdRef.current.delete(photoId);
+      if (!reuploadOnUndo) fileByPhotoIdRef.current.delete(photoId);
       onUploadSucceeded(photoId, url);
     } catch (error: unknown) {
       onUploadFailed(
@@ -573,9 +575,18 @@ export function PhotoManager({
             toast.canUndo && lastRemoval !== null
               ? (): void => {
                   const restoredId = lastRemoval.photo.id;
+                  const restoredFile =
+                    fileByPhotoIdRef.current.get(restoredId);
+                  const shouldReupload =
+                    reuploadOnUndo &&
+                    lastRemoval.photo.status === "ready" &&
+                    restoredFile !== undefined;
                   onUndoRemove();
                   dismissToast();
                   focusTile(restoredId);
+                  if (shouldReupload) {
+                    void uploadPhoto(restoredId, restoredFile);
+                  }
                 }
               : undefined
           }

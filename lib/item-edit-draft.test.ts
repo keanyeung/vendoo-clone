@@ -5,11 +5,13 @@ import {
   cleanupDraftUploads,
   createDraftPhoto,
   createItemEditDraftState,
+  createPhotoCollectionState,
   getDraftChangeSummary,
   getSavablePhotoUrls,
   getUnusedDraftUploadUrls,
   isItemDraftDirty,
   itemEditDraftReducer,
+  photoCollectionReducer,
   type ItemEditDraftState,
 } from "./item-edit-draft";
 import type { ItemDto } from "./item-dto";
@@ -202,6 +204,51 @@ describe("item edit draft", () => {
       PHOTO_TWO,
       PHOTO_ONE,
     ]);
+  });
+});
+
+describe("photo collection reducer", () => {
+  it("returns null until every photo is ready, then preserves reordered URLs", () => {
+    const pendingPhoto = createDraftPhoto(
+      "new-photo",
+      "new-photo.jpg",
+      "blob:new-photo",
+    );
+    const withPending = photoCollectionReducer(
+      createPhotoCollectionState([PHOTO_ONE]),
+      { type: "photos_added", photos: [pendingPhoto] },
+    );
+
+    expect(getSavablePhotoUrls(withPending)).toBeNull();
+
+    const ready = photoCollectionReducer(withPending, {
+      type: "photo_upload_succeeded",
+      photoId: pendingPhoto.id,
+      url: UPLOADED_PHOTO,
+    });
+    const reordered = photoCollectionReducer(ready, {
+      type: "photo_moved",
+      photoId: pendingPhoto.id,
+      toIndex: 0,
+    });
+
+    expect(getSavablePhotoUrls(reordered)).toEqual([
+      UPLOADED_PHOTO,
+      PHOTO_ONE,
+    ]);
+  });
+
+  it("restores a removed photo at its original collection position", () => {
+    const initial = createPhotoCollectionState([PHOTO_ONE, PHOTO_TWO]);
+    const removed = photoCollectionReducer(initial, {
+      type: "photo_removed",
+      photoId: initial.photos[0]?.id ?? "missing",
+    });
+    const restored = photoCollectionReducer(removed, {
+      type: "photo_removal_undone",
+    });
+
+    expect(getSavablePhotoUrls(restored)).toEqual([PHOTO_ONE, PHOTO_TWO]);
   });
 });
 
