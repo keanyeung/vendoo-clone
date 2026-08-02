@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
-import MarkSoldDialog from "@/components/MarkSoldDialog";
+import ListingRowActions from "@/components/listings/ListingRowActions";
 import type { ListingRowDto } from "@/lib/item-dto";
 import { carryListingContext } from "@/lib/listing-context";
 import {
@@ -44,51 +43,7 @@ export default function ListingsTable({ items, now }: ListingsTableProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [sellItem, setSellItem] = useState<ListingRowDto | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const currentSort = parseSort(searchParams.get("sort"));
-
-  async function changeStatus(
-    item: ListingRowDto,
-    status: "DRAFT" | "LISTED",
-  ): Promise<void> {
-    if (pendingId) return;
-    setPendingId(item.id);
-    setActionError(null);
-    try {
-      const res = await fetch(`/api/items/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "set_status", data: { status } }),
-      });
-      if (!res.ok) {
-        let message = `Update failed (status ${res.status}).`;
-        try {
-          const body: unknown = await res.json();
-          if (
-            typeof body === "object" &&
-            body !== null &&
-            "error" in body &&
-            typeof body.error === "string"
-          ) {
-            message = body.error;
-          }
-        } catch {
-          // Keep the status-based fallback when the response is not JSON.
-        }
-        setActionError(message);
-        return;
-      }
-      router.refresh();
-    } catch {
-      setActionError(
-        "Could not reach the server. Check your connection and try again.",
-      );
-    } finally {
-      setPendingId(null);
-    }
-  }
 
   function onSort(field: SortField): void {
     const nextDir =
@@ -119,25 +74,7 @@ export default function ListingsTable({ items, now }: ListingsTableProps) {
 
   return (
     <>
-      {actionError && (
-        <div
-          role="alert"
-          className="mt-8 flex items-start justify-between gap-3 rounded-md border border-red-600/30 bg-red-600/[.06] px-3 py-2 text-sm text-red-700 dark:border-red-400/30 dark:text-red-400"
-        >
-          <p>{actionError}</p>
-          <button
-            type="button"
-            onClick={() => setActionError(null)}
-            className="shrink-0 font-medium"
-            aria-label="Dismiss action error"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-      <div
-        className={`${actionError ? "mt-3" : "mt-8"} overflow-x-auto rounded-xl border border-black/15 dark:border-white/20`}
-      >
+      <div className="mt-8 overflow-x-auto rounded-xl border border-black/15 dark:border-white/20">
       <table className="w-full text-sm">
         <caption className="sr-only">Your listings</caption>
         <thead>
@@ -291,42 +228,7 @@ export default function ListingsTable({ items, now }: ListingsTableProps) {
                   onClick={(event) => event.stopPropagation()}
                   className="whitespace-nowrap px-4 py-3 text-right hidden sm:table-cell"
                 >
-                  {item.status === "SOLD" ? (
-                    <button
-                      type="button"
-                      onClick={() => void changeStatus(item, "LISTED")}
-                      disabled={pendingId === item.id}
-                      className="rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20"
-                    >
-                      Relist
-                    </button>
-                  ) : (
-                    <div className="flex items-center justify-end gap-2">
-                      <select
-                        aria-label={`Change status for ${item.title}`}
-                        value={item.status}
-                        onChange={(event) =>
-                          void changeStatus(
-                            item,
-                            event.target.value as "DRAFT" | "LISTED",
-                          )
-                        }
-                        disabled={pendingId === item.id}
-                        className="rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20"
-                      >
-                        <option value="DRAFT">Draft</option>
-                        <option value="LISTED">Listed</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => setSellItem(item)}
-                        disabled={pendingId === item.id}
-                        className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Mark sold
-                      </button>
-                    </div>
-                  )}
+                  <ListingRowActions item={item} variant="table" />
                 </td>
               </tr>
             );
@@ -334,14 +236,6 @@ export default function ListingsTable({ items, now }: ListingsTableProps) {
         </tbody>
       </table>
       </div>
-      <MarkSoldDialog
-        item={sellItem}
-        onClose={() => setSellItem(null)}
-        onSold={() => {
-          setSellItem(null);
-          router.refresh();
-        }}
-      />
     </>
   );
 }

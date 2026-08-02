@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import ListingsFilterBar from "@/components/ListingsFilterBar";
 import ListingsTable from "@/components/ListingsTable";
 import ListingsViewToggle from "@/components/ListingsViewToggle";
+import ListingCard from "@/components/listings/ListingCard";
 import ListingsPagination from "@/components/listings/ListingsPagination";
-import type { ListingRowDto } from "@/lib/item-dto";
 import { toListingRowDtos } from "@/lib/item-dto";
 import { ATTENTION_FILTERS } from "@/lib/listing-filters";
 import {
@@ -13,7 +13,6 @@ import {
 } from "@/lib/listing-context";
 import { PAGE_SIZE, paginate } from "@/lib/listing-page";
 import { sortItems } from "@/lib/listing-sort";
-import { STATUS_STYLES } from "@/lib/status-style";
 import { prisma } from "@/lib/db";
 
 // This database-backed page must render fresh on every request, not with stale build-time data.
@@ -23,69 +22,7 @@ export const metadata: Metadata = {
   title: "Listings",
 };
 
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
 const MAX_SORT_ITEMS = 2000;
-
-function ListingCard({ item }: { item: ListingRowDto }) {
-  const photo = item.photos[0];
-  const status = STATUS_STYLES[item.status];
-  const metadata = [item.brand, item.size, item.category].filter(
-    (value: string | null): value is string => value !== null,
-  );
-  const createdDate = new Date(item.createdAt).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-black/15 dark:border-white/20">
-      {photo ? (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={photo}
-            alt={`Photo of ${item.title}`}
-            className="aspect-square w-full object-cover"
-          />
-        </>
-      ) : (
-        <div className="flex aspect-square w-full items-center justify-center bg-black/[.04] text-sm text-black/60 dark:bg-white/[.06] dark:text-white/60">
-          No photo
-        </div>
-      )}
-
-      <div className="space-y-3 border-t border-black/10 p-4 dark:border-white/15">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="line-clamp-2 font-semibold">{item.title}</h2>
-          <span
-            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}
-          >
-            {status.label}
-          </span>
-        </div>
-
-        <p className="text-lg font-semibold">
-          {currencyFormatter.format(item.listPrice)}
-        </p>
-
-        {metadata.length > 0 && (
-          <p className="text-sm text-black/60 dark:text-white/60">
-            {metadata.join(" · ")}
-          </p>
-        )}
-
-        <p className="text-xs text-black/60 dark:text-white/60">
-          {createdDate}
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export default async function ListingsPage(props: {
   searchParams: Promise<{
@@ -242,18 +179,26 @@ export default async function ListingsPage(props: {
             <ListingsTable items={itemDtos} now={now} />
           ) : (
             <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {itemDtos.map((item) => (
-                <Link
-                  key={item.id}
-                  href={carryListingContext(
-                    `/listings/${item.id}`,
-                    listingContext,
-                  )}
-                  className="rounded-xl transition-colors hover:bg-black/[.03] dark:hover:bg-white/[.04]"
-                >
-                  <ListingCard item={item} />
-                </Link>
-              ))}
+              {itemDtos.map((item) => {
+                const itemHref = carryListingContext(
+                  `/listings/${item.id}`,
+                  listingContext,
+                );
+                const editHref = carryListingContext(
+                  `/listings/${item.id}/edit`,
+                  listingContext,
+                );
+
+                return (
+                  <ListingCard
+                    key={item.id}
+                    item={item}
+                    itemHref={itemHref}
+                    editHref={editHref}
+                    now={now}
+                  />
+                );
+              })}
             </section>
           )}
           <ListingsPagination
