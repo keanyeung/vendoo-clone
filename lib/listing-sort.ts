@@ -14,6 +14,23 @@ export type SortToken = { field: SortField; dir: SortDir };
 
 export const DEFAULT_SORT: SortToken = { field: "added", dir: "desc" };
 
+export const SORT_OPTIONS = [
+  { token: { field: "added", dir: "desc" }, label: "Added (newest first)" },
+  { token: { field: "added", dir: "asc" }, label: "Added (oldest first)" },
+  { token: { field: "price", dir: "desc" }, label: "List price (high to low)" },
+  { token: { field: "price", dir: "asc" }, label: "List price (low to high)" },
+  { token: { field: "days", dir: "desc" }, label: "Days listed (longest first)" },
+  { token: { field: "days", dir: "asc" }, label: "Days listed (shortest first)" },
+  { token: { field: "title", dir: "asc" }, label: "Title (A to Z)" },
+  { token: { field: "title", dir: "desc" }, label: "Title (Z to A)" },
+  { token: { field: "status", dir: "asc" }, label: "Status (draft to sold)" },
+  { token: { field: "status", dir: "desc" }, label: "Status (sold to draft)" },
+  { token: { field: "sold", dir: "desc" }, label: "Sold price (high to low)" },
+  { token: { field: "sold", dir: "asc" }, label: "Sold price (low to high)" },
+  { token: { field: "soldDate", dir: "desc" }, label: "Sold date (newest first)" },
+  { token: { field: "soldDate", dir: "asc" }, label: "Sold date (oldest first)" },
+] satisfies Array<{ token: SortToken; label: string }>;
+
 const sortFields = new Set<SortField>([
   "added",
   "price",

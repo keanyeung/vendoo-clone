@@ -24,14 +24,32 @@ export default function AppHeader() {
   if (pathname === "/login") return null;
 
   return (
-    <header
-      className={`sticky top-0 z-10 border-b border-black/10 bg-background/90 backdrop-blur-sm dark:border-white/15 ${
-        pathname === "/new" ? "hidden lg:block" : ""
-      }`}
-    >
+    <header className="sticky top-0 z-10 border-b border-black/10 bg-background/90 backdrop-blur-sm dark:border-white/15">
+      {pathname === "/new" && (
+        <div className="mx-auto flex h-15 max-w-[1120px] items-center justify-between gap-4 px-4 lg:hidden">
+          <Link
+            href="/listings"
+            aria-label="Back to listings"
+            className="inline-flex min-h-11 items-center rounded-md pr-3 text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
+          >
+            <span aria-hidden="true">←</span>&nbsp;Listings
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center text-[15px] font-semibold tracking-tight"
+          >
+            Vendoo Clone
+          </Link>
+        </div>
+      )}
+
       {/* Tighter padding and cluster gap below sm: at 390px the nav and both buttons
           need every pixel, and anything wider than the viewport scrolls the whole page. */}
-      <div className="mx-auto flex h-15 max-w-[1120px] items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6">
+      <div
+        className={`mx-auto h-15 max-w-[1120px] items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6 ${
+          pathname === "/new" ? "hidden lg:flex" : "flex"
+        }`}
+      >
         <div className="flex items-center gap-4 sm:gap-7">
           {/* Hidden on phones: the wordmark plus both button labels overflow a 390px
               viewport, and the Home link already covers what it would be tapped for. */}

@@ -10,7 +10,14 @@ import { ListingSavedToast } from "@/components/item/ListingSavedToast";
 import { PricePanel } from "@/components/item/PricePanel";
 import { SaleSummary } from "@/components/item/SaleSummary";
 import { prisma } from "@/lib/db";
+import type { ItemDto } from "@/lib/item-dto";
 import { toItemDto } from "@/lib/item-dto";
+import {
+  buildListingQuery,
+  buildListingsHref,
+} from "@/lib/listing-context";
+import { sortItems } from "@/lib/listing-sort";
+import { getListingBody } from "@/lib/listing-text";
 
 // This database-backed page must render fresh on every request.
 export const dynamic = "force-dynamic";
@@ -45,26 +52,99 @@ function DetailValue({ value }: { value: string | null }) {
   );
 }
 
+function firstSearchParam(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
+}
+
+function listingContextValue(searchParams: {
+  [key: string]: string | string[] | undefined;
+}): string | null {
+  if (!firstSearchParam(searchParams.from)) return null;
+
+  const listingsHref = buildListingsHref(searchParams);
+  const separatorIndex = listingsHref.indexOf("?");
+  return separatorIndex === -1 ? null : listingsHref.slice(separatorIndex + 1);
+}
+
 export default async function ItemDetailPage(
   props: PageProps<"/listings/[id]">,
 ) {
   const { id } = await props.params;
   const searchParams = await props.searchParams;
-  const item = await prisma.item.findUnique({ where: { id } });
+  const from = listingContextValue(searchParams);
+  const listingQuery = buildListingQuery(searchParams);
+  // Capture one request-time value so every days-listed comparison agrees.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
+  const [item, neighbourRows] = await Promise.all([
+    prisma.item.findUnique({ where: { id } }),
+    from === null
+      ? Promise.resolve(null)
+      : prisma.item.findMany({
+          where: listingQuery.where,
+          // sortItems needs these keys to reproduce every in-memory list sort;
+          // no photos, listing content, notes, or AI fields are loaded again.
+          select: {
+            id: true,
+            createdAt: true,
+            listPrice: true,
+            soldPrice: true,
+            soldDate: true,
+            status: true,
+            title: true,
+          },
+        }),
+  ]);
 
   if (item === null) {
     notFound();
   }
 
   const itemDto = toItemDto(item);
+  const orderedIds =
+    neighbourRows === null
+      ? null
+      : sortItems(
+          neighbourRows.map((row) => ({
+            id: row.id,
+            createdAt: row.createdAt.toISOString(),
+            listPrice: Number(row.listPrice),
+            soldPrice: row.soldPrice === null ? null : Number(row.soldPrice),
+            soldDate:
+              row.soldDate === null ? null : row.soldDate.toISOString(),
+            status: row.status,
+            title: row.title,
+          })) as ItemDto[],
+          listingQuery.sortToken,
+          now,
+        ).map((row) => row.id);
+  const itemIndex = orderedIds?.indexOf(itemDto.id) ?? -1;
+  const navigation =
+    orderedIds === null
+      ? null
+      : {
+          previousId: itemIndex > 0 ? orderedIds[itemIndex - 1] : null,
+          nextId:
+            itemIndex >= 0 && itemIndex < orderedIds.length - 1
+              ? orderedIds[itemIndex + 1]
+              : null,
+          position: itemIndex === -1 ? null : itemIndex + 1,
+          total: orderedIds.length,
+        };
+  const listingBody = getListingBody(itemDto);
   const createdDate = formatDate(itemDto.createdAt);
   const updatedDate = formatDate(itemDto.updatedAt);
 
   return (
     <ItemDetailProvider>
-      <ListingSavedToast itemId={itemDto.id} show={searchParams.saved === "1"} />
+      <ListingSavedToast
+        itemId={itemDto.id}
+        show={searchParams.saved === "1"}
+        from={from}
+      />
       <ItemSaleController item={itemDto} />
-      <ItemActionBar item={itemDto} />
+      <ItemActionBar item={itemDto} from={from} navigation={navigation} />
       <main className="mx-auto w-full max-w-[1120px] flex-1 px-4 py-6 sm:px-6">
         <div className="flex flex-wrap items-start gap-9">
           <div className="min-w-0 max-w-[440px] flex-[1_1_400px]">
@@ -88,7 +168,7 @@ export default async function ItemDetailPage(
             <section className="mt-8 rounded-xl border border-black/15 p-6 dark:border-white/20">
               <h2 className="text-lg font-semibold">Listing content</h2>
               <p className="mt-4 whitespace-pre-line leading-7">
-                {itemDto.description}
+                {listingBody}
               </p>
               <dl className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 <div>

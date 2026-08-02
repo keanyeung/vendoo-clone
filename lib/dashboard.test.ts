@@ -265,7 +265,7 @@ describe("computeDashboard", () => {
           title: "1 listing over 45 days",
           detail: "Consider a price drop",
           action: "Price",
-          href: "/listings?status=LISTED&sort=oldest",
+          href: "/listings?status=LISTED&sort=added-asc",
           count: 1,
         },
         {

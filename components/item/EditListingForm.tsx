@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   type ChangeEvent,
   type FormEvent,
@@ -10,12 +10,17 @@ import {
   useState,
 } from "react";
 
+import { CopyListingSection } from "@/components/CopyListingSection";
 import { PhotoManager } from "@/components/item/PhotoManager";
 import { CONDITION_VALUES } from "@/lib/analysis-schema";
-import { buildItemUpdateInput } from "@/lib/item-edit-draft";
+import {
+  buildEditDraftItemDto,
+  buildItemUpdateInput,
+} from "@/lib/item-edit-draft";
 import type { ItemDraftFields } from "@/lib/item-edit-draft";
 import type { ItemDto } from "@/lib/item-dto";
 import { UpdateItemSchema } from "@/lib/item-schema";
+import { carryListingContext } from "@/lib/listing-context";
 import { useItemDraft } from "@/lib/useItemDraft";
 
 type FieldErrors = Record<string, string>;
@@ -74,6 +79,7 @@ function ErrorText({
 
 export function EditListingForm({ item }: { item: ItemDto }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const draft = useItemDraft(item);
   const [keywordDraft, setKeywordDraft] = useState<string>("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -83,6 +89,13 @@ export function EditListingForm({ item }: { item: ItemDto }) {
   const listPrice = numberValue(draft.fields.listPrice);
   const purchasePrice = numberValue(draft.fields.purchasePrice);
   const margin = listPrice - purchasePrice;
+  const previewItem = buildEditDraftItemDto(
+    item,
+    draft.fields,
+    draft.photos.flatMap((photo): string[] =>
+      photo.url === null ? [] : [photo.url],
+    ),
+  );
   const hasIncompletePhotos =
     draft.photos.length > 0 && draft.savablePhotoUrls === null;
   const canSave =
@@ -90,6 +103,11 @@ export function EditListingForm({ item }: { item: ItemDto }) {
     draft.savablePhotoUrls !== null &&
     !isSaving &&
     !isDiscarding;
+  const from = searchParams.get("from");
+  const itemHref = from
+    ? carryListingContext(`/listings/${item.id}`, { from })
+    : `/listings/${item.id}`;
+  const savedItemHref = `${itemHref}${itemHref.includes("?") ? "&" : "?"}saved=1`;
 
   useEffect(() => {
     if (!draft.dirty) return;
@@ -251,7 +269,7 @@ export function EditListingForm({ item }: { item: ItemDto }) {
       }
 
       await draft.finalizeSave();
-      router.push(`/listings/${item.id}?saved=1`);
+      router.push(savedItemHref);
       router.refresh();
     } catch {
       setSubmitError(
@@ -280,7 +298,7 @@ export function EditListingForm({ item }: { item: ItemDto }) {
       <header className="sticky top-15 z-[9] border-b border-black/10 bg-background/90 backdrop-blur-sm dark:border-white/15">
         <div className="mx-auto flex min-h-15 w-full max-w-[1180px] items-center gap-2 px-4 py-2 sm:px-6">
           <Link
-            href={`/listings/${item.id}`}
+            href={itemHref}
             data-draft-guarded="true"
             onNavigate={(event): void => {
               if (
@@ -387,15 +405,22 @@ export function EditListingForm({ item }: { item: ItemDto }) {
                     htmlFor="edit-description"
                     className="text-sm font-medium"
                   >
-                    Description
+                    Marketplace listing body
                   </label>
                   <textarea
                     id="edit-description"
                     rows={5}
                     value={draft.fields.description}
                     onChange={updateField("description")}
+                    aria-describedby="edit-description-marketplace-help"
                     className={controlClass}
                   />
+                  <p
+                    id="edit-description-marketplace-help"
+                    className="text-xs text-black/60 dark:text-white/60"
+                  >
+                    This is the text copied to Facebook, Depop and eBay.
+                  </p>
                   <ErrorText field="description" errors={fieldErrors} />
                 </div>
 
@@ -457,6 +482,8 @@ export function EditListingForm({ item }: { item: ItemDto }) {
                 </div>
               </div>
             </section>
+
+            <CopyListingSection item={previewItem} className="mt-0" />
 
             <section className="rounded-xl border border-black/15 p-5 dark:border-white/20 sm:p-6">
               <h2 className="font-semibold">Item attributes</h2>

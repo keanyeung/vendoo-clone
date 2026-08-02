@@ -159,15 +159,22 @@ export default function ItemForm({
 
         <div className="space-y-1 lg:col-span-2">
           <label htmlFor="description" className="text-sm font-medium">
-            Description
+            Marketplace listing body
           </label>
           <textarea
             id="description"
             rows={5}
             value={draft.description}
             onChange={(event) => onChange("description", event.target.value)}
+            aria-describedby="description-marketplace-help"
             className={control}
           />
+          <p
+            id="description-marketplace-help"
+            className="text-xs text-black/60 dark:text-white/60"
+          >
+            This is the text copied to Facebook, Depop and eBay.
+          </p>
           <ErrorText name="description" errors={fieldErrors} />
         </div>
 

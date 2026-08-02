@@ -163,6 +163,35 @@ export function buildItemUpdateInput(
   };
 }
 
+export function buildEditDraftItemDto(
+  item: ItemDto,
+  fields: ItemDraftFields,
+  photos: string[],
+): ItemDto {
+  const input = buildItemUpdateInput(fields, photos);
+  const finiteMoney = (value: number): number =>
+    Number.isFinite(value) ? value : 0;
+
+  return {
+    ...item,
+    photos: input.photos ?? item.photos,
+    title: input.title,
+    summary: input.summary,
+    description: input.description,
+    brand: input.brand,
+    category: input.category,
+    size: input.size,
+    color: input.color,
+    condition: input.condition,
+    conditionNotes: input.conditionNotes,
+    listPrice: finiteMoney(input.listPrice),
+    purchasePrice: finiteMoney(input.purchasePrice),
+    keywords: input.keywords,
+    purchaseDate: input.purchaseDate,
+    notes: input.notes,
+  };
+}
+
 export function createItemEditDraftState(item: ItemDto): ItemEditDraftState {
   const fields = createItemDraftFields(item);
   const photos = item.photos.map(existingPhoto);

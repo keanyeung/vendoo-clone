@@ -5,8 +5,15 @@ import {
   useEffect,
   useRef,
   useState,
+  useTransition,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  DEFAULT_SORT,
+  parseSort,
+  serializeSort,
+  SORT_OPTIONS,
+} from "@/lib/listing-sort";
 
 export type ListingsFilterBarProps = {
   status: string;
@@ -24,8 +31,11 @@ export default function ListingsFilterBar({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const rawSort = searchParams.get("sort") ?? "";
+  const rawSort = searchParams.get("sort");
+  const normalizedSort = serializeSort(parseSort(rawSort));
+  const defaultSort = serializeSort(DEFAULT_SORT);
   const [searchText, setSearchText] = useState(q);
+  const [isPending, startTransition] = useTransition();
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   // The q value this component last navigated to, so the effect below can tell
   // an echo of our own navigation apart from an externally driven change.
@@ -48,19 +58,28 @@ export default function ListingsFilterBar({
     };
   }, []);
 
-  function navigate(nextStatus: string, nextQ: string, nextSort: string): void {
+  function navigate(
+    nextStatus: string,
+    nextQ: string,
+    nextSort: string | null,
+  ): void {
     const params = new URLSearchParams();
     const trimmedQ = nextQ.trim();
+    const nextNormalizedSort = serializeSort(parseSort(nextSort));
 
     if (nextStatus) params.set("status", nextStatus);
     if (trimmedQ) params.set("q", trimmedQ);
-    if (nextSort && nextSort !== "newest") params.set("sort", nextSort);
+    if (nextNormalizedSort !== defaultSort) {
+      params.set("sort", nextNormalizedSort);
+    }
     if (view === "table") params.set("view", "table");
 
     navigatedQRef.current = trimmedQ;
 
     const queryString = params.toString();
-    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+    startTransition((): void => {
+      router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+    });
   }
 
   function handleStatusChange(event: ChangeEvent<HTMLSelectElement>): void {
@@ -86,24 +105,21 @@ export default function ListingsFilterBar({
     clearTimeout(searchTimeoutRef.current);
     setSearchText("");
     navigatedQRef.current = "";
-    router.replace(view === "table" ? `${pathname}?view=table` : pathname);
+    startTransition((): void => {
+      router.replace(view === "table" ? `${pathname}?view=table` : pathname);
+    });
   }
 
   const hasActiveFilters =
-    status !== "" || q.trim() !== "" || sort !== "newest";
-  const selectValue = [
-    "newest",
-    "oldest",
-    "price-high",
-    "price-low",
-  ].includes(sort)
-    ? sort
-    : "newest";
+    status !== "" || q.trim() !== "" || sort !== defaultSort;
   const controlClassName =
     "rounded-md border border-black/15 bg-white px-3 py-2 text-base text-black outline-none focus:border-black/40 dark:border-white/20 dark:bg-black dark:text-white dark:focus:border-white/50";
 
   return (
-    <div className="mt-6 flex flex-col gap-4 rounded-xl border border-black/15 p-4 dark:border-white/20 sm:flex-row sm:items-end">
+    <div
+      aria-busy={isPending}
+      className="mt-6 flex flex-col gap-4 rounded-xl border border-black/15 p-4 dark:border-white/20 sm:flex-row sm:items-end"
+    >
       <label className="flex flex-col gap-1 text-sm font-medium">
         Status
         <select
@@ -119,7 +135,18 @@ export default function ListingsFilterBar({
       </label>
 
       <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium">
-        Search
+        <span className="flex items-center justify-between gap-2">
+          Search
+          <span
+            aria-live="polite"
+            aria-atomic="true"
+            className="h-4 text-xs font-normal text-black/60 dark:text-white/60"
+          >
+            {isPending ? (
+              <span className="motion-safe:animate-pulse">Updating…</span>
+            ) : null}
+          </span>
+        </span>
         <input
           type="search"
           value={searchText}
@@ -129,21 +156,23 @@ export default function ListingsFilterBar({
         />
       </label>
 
-      {view === "grid" && (
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Sort
-          <select
-            value={selectValue}
-            onChange={handleSortChange}
-            className={controlClassName}
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="price-high">Price: high to low</option>
-            <option value="price-low">Price: low to high</option>
-          </select>
-        </label>
-      )}
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Sort
+        <select
+          value={normalizedSort}
+          onChange={handleSortChange}
+          className={controlClassName}
+        >
+          {SORT_OPTIONS.map((option) => (
+            <option
+              key={serializeSort(option.token)}
+              value={serializeSort(option.token)}
+            >
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {hasActiveFilters && (
         <button

@@ -151,9 +151,7 @@ function buildAttention(items: ItemDto[], nowMs: number): AttentionItem[] {
       title: `${agingListings.length} ${agingListings.length === 1 ? "listing" : "listings"} over 45 days`,
       detail: "Consider a price drop",
       action: "Price",
-      // "oldest" rather than "added-asc": both parse to the same token, but only the legacy
-      // aliases pass the isSortValue() guard that drives the Sort control on /listings.
-      href: "/listings?status=LISTED&sort=oldest",
+      href: "/listings?status=LISTED&sort=added-asc",
       count: agingListings.length,
     },
     {
