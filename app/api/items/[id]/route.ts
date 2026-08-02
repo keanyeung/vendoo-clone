@@ -1,9 +1,11 @@
 import { Prisma } from "@prisma/client";
+import type { ZodError } from "zod";
 
 import { isAuthenticated } from "@/lib/auth";
 import { cleanupUnreferencedItemPhotos } from "@/lib/item-cleanup";
 import { prisma } from "@/lib/db";
 import {
+  CreateItemSchema,
   formatZodIssues,
   ItemMutationSchema,
   type ItemMutationInput,
@@ -12,6 +14,36 @@ import { getRemovedPhotoUrls, isAppPhotoUrl } from "@/lib/photos";
 import { deletePhoto } from "@/lib/storage";
 
 export const runtime = "nodejs";
+
+function formatFieldErrors(error: ZodError): Record<string, string> {
+  const fields: Record<string, string> = {};
+
+  for (const issue of error.issues) {
+    const field = String(issue.path[0] ?? "_form");
+    fields[field] ??= issue.message;
+  }
+
+  return fields;
+}
+
+async function cleanupRemovedPhotos(
+  originalPhotos: string[],
+  updatedPhotos: string[],
+): Promise<void> {
+  const removedPhotoUrls = getRemovedPhotoUrls(originalPhotos, updatedPhotos);
+
+  for (const photoUrl of removedPhotoUrls) {
+    try {
+      const isStillReferenced =
+        (await prisma.item.count({
+          where: { photos: { has: photoUrl } },
+        })) > 0;
+      if (!isStillReferenced) await deletePhoto(photoUrl);
+    } catch {
+      // The item update is authoritative. Failed object cleanup can be retried later.
+    }
+  }
+}
 
 export async function PATCH(
   request: Request,
@@ -44,7 +76,14 @@ export async function PATCH(
 
   const mutation: ItemMutationInput = parsed.data;
 
-  if (mutation.action === "update" && mutation.data.photos !== undefined) {
+  const updatedPhotos =
+    mutation.action === "update"
+      ? mutation.data.photos
+      : mutation.action === "update_draft"
+        ? mutation.data.photos
+        : undefined;
+
+  if (updatedPhotos !== undefined) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl) {
       return Response.json(
@@ -58,7 +97,7 @@ export async function PATCH(
 
     const storageBucket = process.env.SUPABASE_STORAGE_BUCKET ?? "item-photos";
     if (
-      mutation.data.photos.some(
+      updatedPhotos.some(
         (photoUrl: string): boolean =>
           !isAppPhotoUrl(photoUrl, supabaseUrl, storageBucket),
       )
@@ -116,23 +155,74 @@ export async function PATCH(
         });
 
         if (mutation.data.photos !== undefined && originalPhotos !== null) {
-          const removedPhotoUrls = getRemovedPhotoUrls(
+          await cleanupRemovedPhotos(
             originalPhotos.photos,
             mutation.data.photos,
           );
-
-          for (const photoUrl of removedPhotoUrls) {
-            try {
-              const isStillReferenced =
-                (await prisma.item.count({
-                  where: { photos: { has: photoUrl } },
-                })) > 0;
-              if (!isStillReferenced) await deletePhoto(photoUrl);
-            } catch {
-              // The item update is authoritative. Failed object cleanup can be retried later.
-            }
-          }
         }
+        break;
+      }
+      case "update_draft": {
+        const item = await prisma.item.findUnique({
+          where: { id },
+          select: { status: true, photos: true },
+        });
+        if (item === null) {
+          return Response.json(
+            { error: "Item not found." },
+            { status: 404 },
+          );
+        }
+        if (item.status !== "DRAFT") {
+          return Response.json(
+            { error: "Only draft items can be updated with update_draft." },
+            { status: 409 },
+          );
+        }
+
+        const updated = await prisma.item.updateMany({
+          where: { id, status: "DRAFT" },
+          data: {
+            photos: mutation.data.photos,
+            title: mutation.data.title,
+            summary: mutation.data.summary,
+            description: mutation.data.description,
+            brand: mutation.data.brand,
+            category: mutation.data.category,
+            size: mutation.data.size,
+            color: mutation.data.color,
+            condition: mutation.data.condition,
+            conditionNotes: mutation.data.conditionNotes,
+            suggestedPrice: mutation.data.suggestedPrice,
+            priceLow: mutation.data.priceLow,
+            priceHigh: mutation.data.priceHigh,
+            priceReasoning: mutation.data.priceReasoning,
+            listPrice: mutation.data.listPrice ?? 0,
+            purchasePrice: mutation.data.purchasePrice ?? 0,
+            keywords: mutation.data.keywords,
+            aiConfidence: mutation.data.aiConfidence,
+            purchaseDate:
+              mutation.data.purchaseDate === null
+                ? null
+                : new Date(mutation.data.purchaseDate),
+            notes: mutation.data.notes,
+            ...(mutation.data.draftStep === undefined
+              ? {}
+              : { draftStep: mutation.data.draftStep }),
+          },
+        });
+
+        if (updated.count === 0) {
+          return Response.json(
+            {
+              error:
+                "This item is no longer a draft, so its draft changes were not saved.",
+            },
+            { status: 409 },
+          );
+        }
+
+        await cleanupRemovedPhotos(item.photos, mutation.data.photos);
         break;
       }
       case "mark_sold": {
@@ -202,13 +292,57 @@ export async function PATCH(
       case "set_status": {
         const item = await prisma.item.findUnique({
           where: { id },
-          select: { status: true },
         });
         if (item === null) {
           return Response.json(
             { error: "Item not found." },
             { status: 404 },
           );
+        }
+
+        if (item.status === "DRAFT" && mutation.data.status === "LISTED") {
+          const purchasePrice = Number(item.purchasePrice);
+          const strictItem = CreateItemSchema.safeParse({
+            photos: item.photos,
+            title: item.title,
+            summary: item.summary,
+            description: item.description,
+            brand: item.brand,
+            category: item.category,
+            size: item.size,
+            color: item.color,
+            condition: item.condition,
+            conditionNotes: item.conditionNotes,
+            suggestedPrice:
+              item.suggestedPrice === null
+                ? null
+                : Number(item.suggestedPrice),
+            priceLow:
+              item.priceLow === null ? null : Number(item.priceLow),
+            priceHigh:
+              item.priceHigh === null ? null : Number(item.priceHigh),
+            priceReasoning: item.priceReasoning,
+            listPrice: Number(item.listPrice),
+            // Drafts use zero when the non-null database column has not been
+            // filled in. Treat that sentinel as missing at the strict gate.
+            purchasePrice: purchasePrice === 0 ? undefined : purchasePrice,
+            keywords: item.keywords,
+            aiConfidence: item.aiConfidence,
+            purchaseDate: item.purchaseDate?.toISOString() ?? null,
+            notes: item.notes,
+            status: "LISTED",
+          });
+
+          if (!strictItem.success) {
+            return Response.json(
+              {
+                error:
+                  "Complete the required draft fields before listing this item.",
+                fields: formatFieldErrors(strictItem.error),
+              },
+              { status: 400 },
+            );
+          }
         }
 
         await prisma.item.update({

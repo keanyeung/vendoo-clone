@@ -58,7 +58,8 @@ model Item {
   purchaseDate DateTime?
   notes        String?   @db.Text // private notes, never shown in a listing
 
-  status ItemStatus @default(LISTED)
+  status    ItemStatus @default(LISTED)
+  draftStep String?    // how far an unfinished /new draft got: photos | analyzed | reviewed
 
   // Sale details (populated when the item sells).
   soldPrice    Decimal?  @db.Decimal(10, 2)
@@ -67,6 +68,7 @@ model Item {
   platformFees Decimal?  @default(0) @db.Decimal(10, 2)
 
   @@index([status])
+  @@index([status, updatedAt])
   @@index([createdAt])
 }
 

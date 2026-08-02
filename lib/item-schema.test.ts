@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   BulkItemMutationSchema,
+  CreateItemSchema,
+  DraftItemSchema,
   ItemMutationSchema,
   MarkSoldSchema,
 } from "./item-schema";
@@ -17,6 +19,102 @@ function salePayload(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+function itemPayload(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    photos: ["https://example.com/item.jpg"],
+    title: "Vintage denim jacket",
+    summary: null,
+    description: "A well-kept vintage denim jacket.",
+    brand: null,
+    category: "Jacket",
+    size: null,
+    color: "Blue",
+    condition: "good",
+    conditionNotes: null,
+    suggestedPrice: 60,
+    priceLow: 45,
+    priceHigh: 70,
+    priceReasoning: null,
+    listPrice: 60,
+    purchasePrice: 15,
+    keywords: ["denim", "jacket"],
+    aiConfidence: "high",
+    purchaseDate: null,
+    notes: null,
+    status: "LISTED",
+    ...overrides,
+  };
+}
+
+describe("DraftItemSchema", () => {
+  it("accepts an incomplete draft with no category or purchase price", () => {
+    const draft = itemPayload({
+      category: null,
+      listPrice: 0,
+      status: "DRAFT",
+      draftStep: "analyzed",
+    });
+    delete draft.purchasePrice;
+
+    expect(DraftItemSchema.safeParse(draft).success).toBe(true);
+  });
+
+  it.each([
+    ["photos", []],
+    ["title", ""],
+    ["description", ""],
+  ])("still rejects an invalid %s", (field, value) => {
+    const parsed = DraftItemSchema.safeParse(
+      itemPayload({ [field]: value, status: "DRAFT" }),
+    );
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) throw new Error(`Expected ${field} to fail`);
+    expect(parsed.error.issues.map((issue) => issue.path[0])).toContain(field);
+  });
+
+  it("keeps the ordered price-range check", () => {
+    const parsed = DraftItemSchema.safeParse(
+      itemPayload({ priceLow: 80, priceHigh: 40, status: "DRAFT" }),
+    );
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) throw new Error("Expected reversed prices to fail");
+    expect(parsed.error.issues.map((issue) => issue.path[0])).toContain(
+      "priceHigh",
+    );
+  });
+
+  it("rejects an unknown draftStep", () => {
+    expect(
+      DraftItemSchema.safeParse(
+        itemPayload({ status: "DRAFT", draftStep: "published" }),
+      ).success,
+    ).toBe(false);
+  });
+});
+
+describe("CreateItemSchema", () => {
+  it("remains strict for fields relaxed only on drafts", () => {
+    const item = itemPayload({
+      category: "",
+      listPrice: 0,
+      status: "DRAFT",
+    });
+    delete item.purchasePrice;
+
+    const parsed = CreateItemSchema.safeParse(item);
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) throw new Error("Expected strict create to fail");
+    expect(parsed.error.issues.map((issue) => issue.path[0])).toEqual(
+      expect.arrayContaining(["category", "listPrice", "purchasePrice"]),
+    );
+  });
+});
 
 describe("MarkSoldSchema", () => {
   it("accepts a valid payload with today's date", () => {
@@ -87,6 +185,39 @@ describe("MarkSoldSchema", () => {
 });
 
 describe("ItemMutationSchema", () => {
+  it("parses update_draft without allowing a status change", () => {
+    const data = itemPayload({ status: "DRAFT", draftStep: "reviewed" });
+    delete data.status;
+    delete data.purchasePrice;
+
+    const parsed = ItemMutationSchema.safeParse({
+      action: "update_draft",
+      data,
+    });
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) throw new Error("Expected update_draft to parse");
+    if (parsed.data.action !== "update_draft") {
+      throw new Error("Expected update_draft action");
+    }
+    expect(parsed.data.data.draftStep).toBe("reviewed");
+    expect("status" in parsed.data.data).toBe(false);
+  });
+
+  it("parses a DRAFT to LISTED set_status action", () => {
+    const parsed = ItemMutationSchema.safeParse({
+      action: "set_status",
+      data: { status: "LISTED" },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) throw new Error("Expected set_status to parse");
+    if (parsed.data.action !== "set_status") {
+      throw new Error("Expected set_status action");
+    }
+    expect(parsed.data.data.status).toBe("LISTED");
+  });
+
   it("parses edit_sale and narrows its data", () => {
     const parsed = ItemMutationSchema.safeParse({
       action: "edit_sale",

@@ -2,8 +2,8 @@ import { isAuthenticated } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   CreateItemSchema,
+  DraftItemSchema,
   formatZodIssues,
-  type CreateItemInput,
 } from "@/lib/item-schema";
 import { isAppPhotoUrl } from "@/lib/photos";
 
@@ -25,7 +25,14 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const parsed = CreateItemSchema.safeParse(body);
+  const isDraftRequest =
+    typeof body === "object" &&
+    body !== null &&
+    "status" in body &&
+    body.status === "DRAFT";
+  const parsed = isDraftRequest
+    ? DraftItemSchema.safeParse(body)
+    : CreateItemSchema.safeParse(body);
   if (!parsed.success) {
     return Response.json(
       { error: formatZodIssues(parsed.error) },
@@ -33,7 +40,7 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const data: CreateItemInput = parsed.data;
+  const data = parsed.data;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl) {
     return Response.json(
@@ -73,14 +80,17 @@ export async function POST(request: Request): Promise<Response> {
         priceLow: data.priceLow,
         priceHigh: data.priceHigh,
         priceReasoning: data.priceReasoning,
-        listPrice: data.listPrice,
-        purchasePrice: data.purchasePrice,
+        // Price columns predate server drafts and remain non-nullable. Zero is
+        // the storage sentinel for a value the draft has not collected yet.
+        listPrice: data.listPrice ?? 0,
+        purchasePrice: data.purchasePrice ?? 0,
         keywords: data.keywords,
         aiConfidence: data.aiConfidence,
         purchaseDate:
           data.purchaseDate === null ? null : new Date(data.purchaseDate),
         notes: data.notes,
         status: data.status,
+        draftStep: "draftStep" in data ? data.draftStep : undefined,
       },
       select: { id: true },
     });
