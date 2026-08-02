@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 
+import { UndoToast } from "@/components/UndoToast";
 import { compressImage } from "@/lib/compress";
 import {
   createDraftPhoto,
@@ -93,7 +94,6 @@ export function PhotoManager({
   const fileByPhotoIdRef = useRef<Map<string, File>>(new Map());
   const createdPreviewUrlsRef = useRef<Set<string>>(new Set());
   const tileRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
   const [dragOverPhotoId, setDragOverPhotoId] = useState<string | null>(null);
   const [isFileDragOver, setIsFileDragOver] = useState<boolean>(false);
@@ -105,7 +105,6 @@ export function PhotoManager({
   useEffect(() => {
     const createdPreviewUrls = createdPreviewUrlsRef.current;
     return (): void => {
-      if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
       for (const previewUrl of createdPreviewUrls) {
         URL.revokeObjectURL(previewUrl);
       }
@@ -128,19 +127,10 @@ export function PhotoManager({
   }, [lastRemoval, photos]);
 
   function showToast(nextToast: Toast): void {
-    if (toastTimerRef.current !== null) clearTimeout(toastTimerRef.current);
     setToast(nextToast);
-    toastTimerRef.current = setTimeout((): void => {
-      setToast(null);
-      toastTimerRef.current = null;
-    }, 6000);
   }
 
   function dismissToast(): void {
-    if (toastTimerRef.current !== null) {
-      clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
     setToast(null);
   }
 
@@ -577,34 +567,20 @@ export function PhotoManager({
       </p>
 
       {toast !== null && (
-        <div
-          role="status"
-          className="fixed bottom-32 left-1/2 z-50 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-black/15 bg-background px-4 py-3 text-sm shadow-xl dark:border-white/20 sm:bottom-20"
-        >
-          <span>{toast.text}</span>
-          {toast.canUndo && lastRemoval !== null && (
-            <button
-              type="button"
-              onClick={(): void => {
-                const restoredId = lastRemoval.photo.id;
-                onUndoRemove();
-                dismissToast();
-                focusTile(restoredId);
-              }}
-              className="min-h-11 font-semibold text-green-700 dark:text-green-400 sm:min-h-8"
-            >
-              Undo
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={dismissToast}
-            aria-label="Dismiss notification"
-            className="inline-flex size-11 items-center justify-center text-black/55 dark:text-white/55 sm:size-8"
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-        </div>
+        <UndoToast
+          message={toast.text}
+          onUndo={
+            toast.canUndo && lastRemoval !== null
+              ? (): void => {
+                  const restoredId = lastRemoval.photo.id;
+                  onUndoRemove();
+                  dismissToast();
+                  focusTile(restoredId);
+                }
+              : undefined
+          }
+          onDismiss={dismissToast}
+        />
       )}
     </section>
   );

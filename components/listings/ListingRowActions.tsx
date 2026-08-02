@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import MarkSoldDialog from "@/components/MarkSoldDialog";
+import { UndoToast } from "@/components/UndoToast";
 import type { ListingRowDto } from "@/lib/item-dto";
 
 type ListingRowActionsProps = {
@@ -15,6 +16,33 @@ type ListingRowActionsProps = {
 );
 
 type MutableStatus = "DRAFT" | "LISTED";
+type SaleToastState = {
+  message: string;
+  tone?: "default" | "error";
+};
+
+async function readResponseError(
+  response: Response,
+  fallbackAction: string,
+): Promise<string> {
+  let message = `${fallbackAction} failed (status ${response.status}).`;
+
+  try {
+    const body: unknown = await response.json();
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "error" in body &&
+      typeof body.error === "string"
+    ) {
+      message = body.error;
+    }
+  } catch {
+    // Keep the status-based fallback when the response is not JSON.
+  }
+
+  return message;
+}
 
 export default function ListingRowActions(props: ListingRowActionsProps) {
   const { item, variant } = props;
@@ -25,6 +53,8 @@ export default function ListingRowActions(props: ListingRowActionsProps) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [saleToast, setSaleToast] = useState<SaleToastState | null>(null);
+  const [isUndoingSale, setIsUndoingSale] = useState(false);
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -66,21 +96,7 @@ export default function ListingRowActions(props: ListingRowActionsProps) {
       });
 
       if (!response.ok) {
-        let message = `Update failed (status ${response.status}).`;
-        try {
-          const body: unknown = await response.json();
-          if (
-            typeof body === "object" &&
-            body !== null &&
-            "error" in body &&
-            typeof body.error === "string"
-          ) {
-            message = body.error;
-          }
-        } catch {
-          // Keep the status-based fallback when the response is not JSON.
-        }
-        setActionError(message);
+        setActionError(await readResponseError(response, "Update"));
         return;
       }
 
@@ -92,6 +108,42 @@ export default function ListingRowActions(props: ListingRowActionsProps) {
       );
     } finally {
       setPendingId(null);
+    }
+  }
+
+  async function undoSale(): Promise<void> {
+    if (isUndoingSale) return;
+
+    setIsUndoingSale(true);
+
+    try {
+      const response = await fetch(`/api/items/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "set_status",
+          data: { status: "LISTED" },
+        }),
+      });
+
+      if (!response.ok) {
+        setSaleToast({
+          message: await readResponseError(response, "Undo"),
+          tone: "error",
+        });
+        return;
+      }
+
+      setSaleToast(null);
+      router.refresh();
+    } catch {
+      setSaleToast({
+        message:
+          "Could not reach the item service. The sale was not undone; try again.",
+        tone: "error",
+      });
+    } finally {
+      setIsUndoingSale(false);
     }
   }
 
@@ -228,9 +280,22 @@ export default function ListingRowActions(props: ListingRowActionsProps) {
         onClose={() => setSellItem(null)}
         onSold={() => {
           setSellItem(null);
+          setSaleToast({ message: `Marked ${item.title} as sold.` });
           router.refresh();
         }}
       />
+
+      {saleToast !== null && (
+        <UndoToast
+          message={saleToast.message}
+          onUndo={
+            saleToast.tone === "error" ? undefined : () => void undoSale()
+          }
+          onDismiss={() => setSaleToast(null)}
+          isUndoing={isUndoingSale}
+          tone={saleToast.tone}
+        />
+      )}
     </>
   );
 }

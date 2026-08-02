@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { UndoToast } from "@/components/UndoToast";
 import { useListingsSelection } from "@/components/listings/ListingsSelectionProvider";
 
 type MutableStatus = "DRAFT" | "LISTED";
@@ -14,7 +15,11 @@ type Feedback =
       ids: string[];
       undoStatus: MutableStatus;
     }
-  | { kind: "message"; message: string };
+  | {
+      kind: "message";
+      message: string;
+      tone?: "default" | "error";
+    };
 
 type BulkRequestBody =
   | {
@@ -86,7 +91,6 @@ export default function BulkActionBar() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [error, setError] = useState<string | null>(null);
-  // S10 will replace this local confirmation presentation with UndoToast.
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const isPending = pendingAction !== null;
 
@@ -153,11 +157,14 @@ export default function BulkActionBar() {
       });
       router.refresh();
     } catch (caught: unknown) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not reach the item service. Check your connection and try again.",
-      );
+      setFeedback({
+        kind: "message",
+        message:
+          caught instanceof Error
+            ? caught.message
+            : "Could not reach the item service. Check your connection and try again.",
+        tone: "error",
+      });
     } finally {
       setPendingAction(null);
     }
@@ -205,7 +212,7 @@ export default function BulkActionBar() {
     }
   }
 
-  const showBar = selectedCount > 0 || feedback !== null || error !== null;
+  const showBar = selectedCount > 0 || error !== null;
   const focusRing =
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
 
@@ -271,34 +278,6 @@ export default function BulkActionBar() {
               </>
             )}
 
-            {feedback !== null && (
-              <div
-                aria-live="polite"
-                className={`${selectedCount > 0 ? "w-full border-t border-black/10 pt-2 dark:border-white/15" : "flex-1"} flex min-h-11 items-center gap-3 text-sm`}
-              >
-                <p className="flex-1">{feedback.message}</p>
-                {feedback.kind === "undo" && (
-                  <button
-                    type="button"
-                    onClick={() => void handleUndo()}
-                    disabled={isPending}
-                    className={`min-h-11 rounded-md border border-black/15 px-3 font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20 ${focusRing}`}
-                  >
-                    {pendingAction === "undo" ? "Undoing..." : "Undo"}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setFeedback(null)}
-                  disabled={isPending}
-                  aria-label="Dismiss bulk action confirmation"
-                  className={`min-h-11 px-2 font-medium text-black/60 disabled:cursor-not-allowed disabled:opacity-60 dark:text-white/60 ${focusRing}`}
-                >
-                  Dismiss
-                </button>
-              </div>
-            )}
-
             {error !== null && (
               <div
                 role="alert"
@@ -317,6 +296,18 @@ export default function BulkActionBar() {
             )}
           </div>
         </div>
+      )}
+
+      {feedback !== null && (
+        <UndoToast
+          message={feedback.message}
+          onUndo={
+            feedback.kind === "undo" ? () => void handleUndo() : undefined
+          }
+          onDismiss={() => setFeedback(null)}
+          isUndoing={pendingAction === "undo"}
+          tone={feedback.kind === "message" ? feedback.tone : undefined}
+        />
       )}
 
       <dialog
