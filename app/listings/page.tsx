@@ -6,6 +6,7 @@ import ListingsViewToggle from "@/components/ListingsViewToggle";
 import ListingsPagination from "@/components/listings/ListingsPagination";
 import type { ListingRowDto } from "@/lib/item-dto";
 import { toListingRowDtos } from "@/lib/item-dto";
+import { ATTENTION_FILTERS } from "@/lib/listing-filters";
 import {
   buildListingQuery,
   carryListingContext,
@@ -92,13 +93,13 @@ export default async function ListingsPage(props: {
   }>;
 }) {
   const searchParams = await props.searchParams;
-  const { status, q, sort, view, page, sortToken, where } =
+  const { status, q, attention, sort, view, page, sortToken, where } =
     buildListingQuery(searchParams);
   // Capture one request-time value so sorting and the hydrated table agree.
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
 
-  const [items, filteredItems, totalItems] = await Promise.all([
+  const [items, whereFilteredItems, statusGroups] = await Promise.all([
     prisma.item.findMany({
       where,
       select: {
@@ -121,12 +122,32 @@ export default async function ListingsPage(props: {
       take: MAX_SORT_ITEMS,
     }),
     prisma.item.count({ where }),
-    prisma.item.count(),
+    prisma.item.groupBy({ by: ["status"], _count: true }),
   ]);
-  const sortedItems = sortItems(toListingRowDtos(items), sortToken, now);
+  const statusCounts = {
+    DRAFT: 0,
+    LISTED: 0,
+    SOLD: 0,
+  };
+  for (const group of statusGroups) {
+    statusCounts[group.status] = group._count;
+  }
+  const totalItems =
+    statusCounts.DRAFT + statusCounts.LISTED + statusCounts.SOLD;
+  const attentionFilter = ATTENTION_FILTERS.find(
+    (filter) => filter.key === attention,
+  );
+  const rowDtos = toListingRowDtos(items);
+  const matchingItems = attentionFilter
+    ? rowDtos.filter((item) => attentionFilter.matches(item, now))
+    : rowDtos;
+  const filteredItems = attentionFilter
+    ? matchingItems.length
+    : whereFilteredItems;
+  const sortedItems = sortItems(matchingItems, sortToken, now);
   const paginatedItems = paginate(sortedItems, page);
   const itemDtos = paginatedItems.items;
-  const isTruncated = filteredItems > MAX_SORT_ITEMS;
+  const isTruncated = whereFilteredItems > MAX_SORT_ITEMS;
   const firstVisibleItem =
     paginatedItems.total === 0
       ? 0
@@ -137,7 +158,7 @@ export default async function ListingsPage(props: {
     itemDtos.length === 0
       ? "Showing 0"
       : `Showing ${firstVisibleItem}-${lastVisibleItem}`;
-  const hasListFilters = status !== "" || q !== "";
+  const hasListFilters = status !== "" || q !== "" || attention !== "";
   const countLabel =
     hasListFilters
       ? `${visibleRange} of ${filteredItems} - ${totalItems} items total`
@@ -145,6 +166,7 @@ export default async function ListingsPage(props: {
   const listingContext = {
     status,
     q,
+    attention,
     sort,
     view,
     page: paginatedItems.page,
@@ -158,7 +180,14 @@ export default async function ListingsPage(props: {
         </p>
       </div>
 
-      <ListingsFilterBar status={status} q={q} sort={sort} view={view} />
+      <ListingsFilterBar
+        status={status}
+        q={q}
+        attention={attention}
+        sort={sort}
+        view={view}
+        statusCounts={statusCounts}
+      />
 
       {totalItems > 0 && (
         <div className="mt-6 flex justify-end">
@@ -166,6 +195,7 @@ export default async function ListingsPage(props: {
             view={view}
             status={status}
             q={q}
+            attention={attention}
             sort={sort}
           />
         </div>

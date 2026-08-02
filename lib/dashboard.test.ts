@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/analytics", async () => import("./analytics"));
+vi.mock("@/lib/listing-filters", async () => import("./listing-filters"));
 vi.mock("@/lib/listing-sort", async () => import("./listing-sort"));
 
 import { computeDashboard } from "./dashboard";
@@ -257,7 +258,7 @@ describe("computeDashboard", () => {
           title: "1 draft never published",
           detail: "Oldest added 14 days ago",
           action: "Review",
-          href: "/listings?status=DRAFT",
+          href: "/listings?attention=stale-drafts",
           count: 1,
         },
         {
@@ -265,7 +266,7 @@ describe("computeDashboard", () => {
           title: "1 listing over 45 days",
           detail: "Consider a price drop",
           action: "Price",
-          href: "/listings?status=LISTED&sort=added-asc",
+          href: "/listings?attention=aging",
           count: 1,
         },
         {
@@ -273,7 +274,7 @@ describe("computeDashboard", () => {
           title: "1 sale missing fees",
           detail: "Profit is overstated",
           action: "Fix",
-          href: "/listings?status=SOLD",
+          href: "/listings?attention=missing-fees",
           count: 1,
         },
       ],

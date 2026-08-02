@@ -1,5 +1,9 @@
 import type { ItemStatus, Prisma } from "@prisma/client";
 
+import {
+  isAttentionFilterKey,
+  type AttentionFilterKey,
+} from "./listing-filters";
 import { parsePage } from "./listing-page";
 import {
   DEFAULT_SORT,
@@ -15,6 +19,7 @@ type SearchParamReader = Pick<URLSearchParams, "get">;
 export type ListingContext = {
   status: ItemStatus | "";
   q: string;
+  attention: AttentionFilterKey | "";
   sort: string;
   view: "grid" | "table";
   page: number;
@@ -48,11 +53,13 @@ function isItemStatus(value: string): value is ItemStatus {
 
 function parseDirectContext(source: ListingContextInput): ListingContext {
   const rawStatus = readParam(source, "status");
+  const rawAttention = readParam(source, "attention");
   const rawSort = readParam(source, "sort");
 
   return {
     status: isItemStatus(rawStatus) ? rawStatus : "",
     q: readParam(source, "q").trim(),
+    attention: isAttentionFilterKey(rawAttention) ? rawAttention : "",
     sort: serializeSort(parseSort(rawSort)),
     view: readParam(source, "view") === "table" ? "table" : "grid",
     page: parsePage(readParam(source, "page")),
@@ -74,6 +81,7 @@ export function buildListingsHref(params: ListingContextInput): string {
 
   if (context.status) query.set("status", context.status);
   if (context.q) query.set("q", context.q);
+  if (context.attention) query.set("attention", context.attention);
   if (context.sort !== DEFAULT_SORT_VALUE) query.set("sort", context.sort);
   if (context.view === "table") query.set("view", context.view);
   if (context.page > 1) query.set("page", String(context.page));

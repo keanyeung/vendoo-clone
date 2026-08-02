@@ -15,6 +15,7 @@ import {
   buildListingQuery,
   buildListingsHref,
 } from "@/lib/listing-context";
+import { ATTENTION_FILTERS } from "@/lib/listing-filters";
 import { sortItems } from "@/lib/listing-sort";
 import { getListingBody } from "@/lib/listing-text";
 
@@ -90,6 +91,7 @@ export default async function ItemDetailPage(
             listPrice: true,
             soldPrice: true,
             soldDate: true,
+            platformFees: true,
             status: true,
             title: true,
           },
@@ -101,20 +103,28 @@ export default async function ItemDetailPage(
   }
 
   const itemDto = toItemDto(item);
+  const attentionFilter = ATTENTION_FILTERS.find(
+    (filter) => filter.key === listingQuery.attention,
+  );
+  const neighbourDtos = neighbourRows?.map((row) => ({
+    id: row.id,
+    createdAt: row.createdAt.toISOString(),
+    listPrice: Number(row.listPrice),
+    soldPrice: row.soldPrice === null ? null : Number(row.soldPrice),
+    soldDate: row.soldDate === null ? null : row.soldDate.toISOString(),
+    platformFees:
+      row.platformFees === null ? null : Number(row.platformFees),
+    status: row.status,
+    title: row.title,
+  }));
+  const matchingNeighbourDtos = attentionFilter
+    ? neighbourDtos?.filter((row) => attentionFilter.matches(row, now))
+    : neighbourDtos;
   const orderedIds =
-    neighbourRows === null
+    matchingNeighbourDtos == null
       ? null
       : sortItems(
-          neighbourRows.map((row) => ({
-            id: row.id,
-            createdAt: row.createdAt.toISOString(),
-            listPrice: Number(row.listPrice),
-            soldPrice: row.soldPrice === null ? null : Number(row.soldPrice),
-            soldDate:
-              row.soldDate === null ? null : row.soldDate.toISOString(),
-            status: row.status,
-            title: row.title,
-          })),
+          matchingNeighbourDtos,
           listingQuery.sortToken,
           now,
         ).map((row) => row.id);

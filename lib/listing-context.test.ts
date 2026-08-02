@@ -8,11 +8,12 @@ import {
 } from "./listing-context";
 
 describe("listing context", () => {
-  it("normalizes the five supported listing parameters", () => {
+  it("normalizes the six supported listing parameters", () => {
     expect(
       parseListingContext({
         status: "LISTED",
         q: "  wool coat  ",
+        attention: "aging",
         sort: "oldest",
         view: "table",
         page: "3",
@@ -21,6 +22,7 @@ describe("listing context", () => {
     ).toEqual({
       status: "LISTED",
       q: "wool coat",
+      attention: "aging",
       sort: "added-asc",
       view: "table",
       page: 3,
@@ -31,11 +33,12 @@ describe("listing context", () => {
     expect(
       parseListingContext({
         saved: "1",
-        from: "status=LISTED&q=linen+shirt&sort=days-desc&view=table&page=4",
+        from: "status=LISTED&q=linen+shirt&attention=aging&sort=days-desc&view=table&page=4",
       }),
     ).toEqual({
       status: "LISTED",
       q: "linen shirt",
+      attention: "aging",
       sort: "days-desc",
       view: "table",
       page: 4,
@@ -43,30 +46,36 @@ describe("listing context", () => {
     expect(
       buildListingsHref({
         saved: "1",
-        from: "status=LISTED&q=linen+shirt&sort=days-desc&view=table&page=4",
+        from: "status=LISTED&q=linen+shirt&attention=aging&sort=days-desc&view=table&page=4",
       }),
     ).toBe(
-      "/listings?status=LISTED&q=linen+shirt&sort=days-desc&view=table&page=4",
+      "/listings?status=LISTED&q=linen+shirt&attention=aging&sort=days-desc&view=table&page=4",
     );
   });
 
   it("builds a compact, canonical listings href", () => {
+    expect(buildListingsHref({ attention: "aging" })).toBe(
+      "/listings?attention=aging",
+    );
+
     expect(
       buildListingsHref({
         status: "LISTED",
         q: "linen shirt",
+        attention: "missing-fees",
         sort: "days-desc",
         view: "grid",
         page: 2,
       }),
     ).toBe(
-      "/listings?status=LISTED&q=linen+shirt&sort=days-desc&page=2",
+      "/listings?status=LISTED&q=linen+shirt&attention=missing-fees&sort=days-desc&page=2",
     );
 
     expect(
       buildListingsHref({
         status: "",
         q: "",
+        attention: "",
         sort: "newest",
         view: "grid",
         page: 1,
@@ -79,12 +88,13 @@ describe("listing context", () => {
       carryListingContext("/listings/item-1", {
         status: "LISTED",
         q: "",
+        attention: "stale-drafts",
         sort: "days-desc",
         view: "grid",
         page: 4,
       }),
     ).toBe(
-      "/listings/item-1?from=status%3DLISTED%26sort%3Ddays-desc%26page%3D4",
+      "/listings/item-1?from=status%3DLISTED%26attention%3Dstale-drafts%26sort%3Ddays-desc%26page%3D4",
     );
   });
 
@@ -96,6 +106,7 @@ describe("listing context", () => {
     ).toEqual({
       status: "SOLD",
       q: "boots",
+      attention: "",
       sort: "soldDate-asc",
       view: "table",
       page: 1,
@@ -116,6 +127,7 @@ describe("listing context", () => {
       buildListingsHref({
         status: "ARCHIVED",
         q: "   ",
+        attention: "overdue",
         sort: "not-a-sort",
         view: "cards",
         page: "-7",

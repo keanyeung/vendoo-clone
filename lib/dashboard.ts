@@ -8,6 +8,11 @@ import {
 } from "@/lib/analytics";
 import type { MonthlyBucket } from "@/lib/analytics";
 import type { ItemDto } from "@/lib/item-dto";
+import {
+  isAgingListing,
+  isMissingFeesSale,
+  isStaleDraft,
+} from "@/lib/listing-filters";
 import { daysListed } from "@/lib/listing-sort";
 
 // Every figure the homepage renders, computed in one pass from rows the page already fetched.
@@ -123,13 +128,13 @@ function pickBestMonth(monthly: MonthlyBucket[]): MonthlyBucket | null {
 
 function buildAttention(items: ItemDto[], nowMs: number): AttentionItem[] {
   const staleDrafts = items.filter(
-    (item: ItemDto) => item.status === "DRAFT" && daysListed(item, nowMs) > 7,
+    (item: ItemDto) => isStaleDraft(item, nowMs),
   );
   const agingListings = items.filter(
-    (item: ItemDto) => item.status === "LISTED" && daysListed(item, nowMs) > 45,
+    (item: ItemDto) => isAgingListing(item, nowMs),
   );
   const missingFees = items.filter(
-    (item: ItemDto) => item.status === "SOLD" && item.platformFees === null,
+    (item: ItemDto) => isMissingFeesSale(item, nowMs),
   );
 
   let oldestDraftDays = 0;
@@ -143,7 +148,7 @@ function buildAttention(items: ItemDto[], nowMs: number): AttentionItem[] {
       title: `${staleDrafts.length} ${staleDrafts.length === 1 ? "draft" : "drafts"} never published`,
       detail: `Oldest added ${oldestDraftDays} days ago`,
       action: "Review",
-      href: "/listings?status=DRAFT",
+      href: "/listings?attention=stale-drafts",
       count: staleDrafts.length,
     },
     {
@@ -151,7 +156,7 @@ function buildAttention(items: ItemDto[], nowMs: number): AttentionItem[] {
       title: `${agingListings.length} ${agingListings.length === 1 ? "listing" : "listings"} over 45 days`,
       detail: "Consider a price drop",
       action: "Price",
-      href: "/listings?status=LISTED&sort=added-asc",
+      href: "/listings?attention=aging",
       count: agingListings.length,
     },
     {
@@ -159,7 +164,7 @@ function buildAttention(items: ItemDto[], nowMs: number): AttentionItem[] {
       title: `${missingFees.length} ${missingFees.length === 1 ? "sale" : "sales"} missing fees`,
       detail: "Profit is overstated",
       action: "Fix",
-      href: "/listings?status=SOLD",
+      href: "/listings?attention=missing-fees",
       count: missingFees.length,
     },
   ];
