@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ItemDto } from "@/lib/item-dto";
 import {
-  EBAY_TITLE_MAX_LENGTH,
   formatListingText,
+  TITLE_LIMITS,
   truncateTitle,
 } from "@/lib/listing-text";
 import type { ListingPlatform } from "@/lib/listing-text";
@@ -15,6 +15,11 @@ export type ListingCopyController = {
   selectedPlatform: ListingPlatform;
   listingText: string;
   title: string;
+  titleLimit: number;
+  sourceTitleLength: number;
+  sourceTitleExceedsLimit: boolean;
+  titleWasTruncated: boolean;
+  descriptionLength: number;
   copiedTarget: CopyTarget | null;
   error: string | null;
   selectPlatform: (platform: ListingPlatform) => void;
@@ -35,12 +40,16 @@ export function useListingCopy(
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listingText =
     item === null ? "" : formatListingText(item, selectedPlatform);
+  const titleLimit = TITLE_LIMITS[selectedPlatform];
+  const sourceTitleLength = item?.title.length ?? 0;
+  const sourceTitleExceedsLimit = sourceTitleLength > titleLimit;
   const title =
     item === null
       ? ""
       : selectedPlatform === "EBAY"
-        ? truncateTitle(item.title, EBAY_TITLE_MAX_LENGTH)
+        ? truncateTitle(item.title, TITLE_LIMITS.EBAY)
         : item.title;
+  const titleWasTruncated = item !== null && title !== item.title;
 
   function clearConfirmation(): void {
     if (timeoutRef.current !== null) {
@@ -78,7 +87,7 @@ export function useListingCopy(
       timeoutRef.current = setTimeout(() => {
         setCopiedTarget(null);
         timeoutRef.current = null;
-      }, 2000);
+      }, 1600);
     } catch {
       setError(
         "Copying was blocked. You can select the preview text and copy it manually.",
@@ -95,6 +104,11 @@ export function useListingCopy(
     selectedPlatform,
     listingText,
     title,
+    titleLimit,
+    sourceTitleLength,
+    sourceTitleExceedsLimit,
+    titleWasTruncated,
+    descriptionLength: listingText.length,
     copiedTarget,
     error,
     selectPlatform,

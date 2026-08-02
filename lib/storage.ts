@@ -6,6 +6,7 @@ import {
   ALLOWED_MIME_TYPES,
   isAllowedMimeType,
 } from "@/lib/upload-limits";
+import { getAppPhotoObjectPath } from "@/lib/photos";
 
 export {
   ALLOWED_MIME_TYPES,
@@ -68,18 +69,15 @@ export async function uploadPhoto(
 
 export async function deletePhoto(publicUrl: string): Promise<void> {
   const bucket = process.env.SUPABASE_STORAGE_BUCKET ?? "item-photos";
-  const publicPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/`;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    throw new Error("Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL");
+  }
 
-  if (!publicUrl.startsWith(publicPrefix)) {
+  const objectPath = getAppPhotoObjectPath(publicUrl, supabaseUrl, bucket);
+  if (objectPath === null) {
     throw new Error("The URL is not a photo in this app's storage bucket.");
   }
-
-  const encodedObjectPath = publicUrl.slice(publicPrefix.length);
-  if (!encodedObjectPath) {
-    throw new Error("The photo URL does not contain a storage object path.");
-  }
-
-  const objectPath = decodeURIComponent(encodedObjectPath);
   const client = getSupabaseClient();
 
   // Supabase treats a missing object as a no-op, so repeated deletion is safe.

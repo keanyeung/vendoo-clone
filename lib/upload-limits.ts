@@ -4,8 +4,8 @@ export const ALLOWED_MIME_TYPES = {
   "image/webp": "webp",
 } as const;
 
-export const MAX_FILE_BYTES = 8 * 1024 * 1024;
-export const MAX_FILES = 10;
+export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_FILES = 12;
 
 export type AllowedMimeType = keyof typeof ALLOWED_MIME_TYPES;
 

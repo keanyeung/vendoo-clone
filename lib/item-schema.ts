@@ -3,8 +3,8 @@ import { z } from "zod";
 import {
   CONDITION_VALUES,
   CONFIDENCE_VALUES,
-} from "@/lib/analysis-schema";
-import { MAX_FILES } from "@/lib/upload-limits";
+} from "./analysis-schema";
+import { MAX_FILES } from "./upload-limits";
 
 // Single shared contract for creating an inventory item, used by the form and API route so neither can drift.
 const hasAtMostTwoDecimals = (value: number): boolean =>
@@ -20,15 +20,20 @@ const requiredPurchaseMoney = z
   .refine(hasAtMostTwoDecimals, {
     message: "Amount can have at most 2 decimal places.",
   });
+const orderedPhotoUrls = z
+  .array(z.string().url({ message: "Photo URL is malformed." }))
+  .min(1, { message: "At least one photo is required." })
+  .max(MAX_FILES, {
+    message: `At most ${MAX_FILES} photos are allowed.`,
+  })
+  .refine(
+    (photos: string[]): boolean => new Set(photos).size === photos.length,
+    { message: "The same photo cannot appear more than once." },
+  );
 
 export const CreateItemSchema = z
   .object({
-    photos: z
-      .array(z.string())
-      .min(1, { message: "At least one photo is required." })
-      .max(MAX_FILES, {
-        message: `At most ${MAX_FILES} photos are allowed.`,
-      }),
+    photos: orderedPhotoUrls,
     title: z
       .string()
       .trim()
@@ -92,6 +97,9 @@ export function formatZodIssues(error: z.ZodError): string {
 }
 
 export const UpdateItemSchema = z.object({
+  // Optional during the transition so the existing details-only editor remains valid.
+  // The dedicated edit page sends the complete ordered array when it is introduced.
+  photos: orderedPhotoUrls.optional(),
   title: z
     .string()
     .trim()
@@ -124,7 +132,7 @@ export const UpdateItemSchema = z.object({
     })
     .nullable(),
   notes: z.string().nullable(),
-  // Photos, AI reference fields, status, and sale fields have separate ownership or actions.
+  // AI reference fields, status, and sale fields have separate ownership or actions.
 });
 
 export const MarkSoldSchema = z.object({
@@ -136,6 +144,12 @@ export const MarkSoldSchema = z.object({
     .string()
     .refine((value: string): boolean => !Number.isNaN(Date.parse(value)), {
       message: "Sold date is invalid.",
+    })
+    .refine((value: string): boolean => {
+      const parsed = Date.parse(value);
+      return Number.isNaN(parsed) || parsed <= Date.now() + 24 * 60 * 60 * 1000;
+    }, {
+      message: "Sold date cannot be in the future.",
     }),
   platformFees: money
     .nonnegative({
@@ -159,6 +173,10 @@ export const ItemMutationSchema = z.discriminatedUnion("action", [
     data: MarkSoldSchema,
   }),
   z.object({
+    action: z.literal("edit_sale"),
+    data: MarkSoldSchema,
+  }),
+  z.object({
     action: z.literal("set_status"),
     data: SetStatusSchema,
   }),
@@ -166,5 +184,6 @@ export const ItemMutationSchema = z.discriminatedUnion("action", [
 
 export type UpdateItemInput = z.infer<typeof UpdateItemSchema>;
 export type MarkSoldInput = z.infer<typeof MarkSoldSchema>;
+export type EditSaleInput = z.infer<typeof MarkSoldSchema>;
 export type SetStatusInput = z.infer<typeof SetStatusSchema>;
 export type ItemMutationInput = z.infer<typeof ItemMutationSchema>;

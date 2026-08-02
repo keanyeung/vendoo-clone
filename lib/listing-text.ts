@@ -30,7 +30,13 @@ export const LISTING_PLATFORMS = [
   "EBAY",
 ] as const satisfies readonly ListingPlatform[];
 
-export const EBAY_TITLE_MAX_LENGTH = 80;
+export const TITLE_LIMITS = {
+  FB_MARKETPLACE: 100,
+  DEPOP: 65,
+  EBAY: 80,
+} satisfies Record<ListingPlatform, number>;
+
+export const EBAY_TITLE_MAX_LENGTH = TITLE_LIMITS.EBAY;
 
 export function formatPrice(value: number): string {
   return new Intl.NumberFormat("en-US", {

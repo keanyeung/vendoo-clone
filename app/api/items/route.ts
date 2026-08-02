@@ -5,6 +5,7 @@ import {
   formatZodIssues,
   type CreateItemInput,
 } from "@/lib/item-schema";
+import { isAppPhotoUrl } from "@/lib/photos";
 
 export const runtime = "nodejs";
 
@@ -44,19 +45,10 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const allowedPublicPrefix = `${supabaseUrl}/storage/v1/object/public/`;
+  const storageBucket = process.env.SUPABASE_STORAGE_BUCKET ?? "item-photos";
 
   for (const photoUrl of data.photos) {
-    try {
-      new URL(photoUrl);
-    } catch {
-      return Response.json(
-        { error: "A photo URL is malformed." },
-        { status: 400 },
-      );
-    }
-
-    if (!photoUrl.startsWith(allowedPublicPrefix)) {
+    if (!isAppPhotoUrl(photoUrl, supabaseUrl, storageBucket)) {
       return Response.json(
         { error: "A photo URL is not from the app's own storage." },
         { status: 400 },

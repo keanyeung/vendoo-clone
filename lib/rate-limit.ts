@@ -82,11 +82,23 @@ export async function clearForKey(ipHash: string): Promise<void> {
 
 // --- Request-context wrappers used by the login action. ---
 
+// Local development skips the limiter entirely. Behind `next dev` every request
+// shares one loopback address, so a few mistyped passwords lock the owner out of
+// their own machine for ten minutes — and because dev points at the production
+// database, those attempts are written to the real LoginAttempt table.
+//
+// NODE_ENV is "production" for `next build`, `next start`, and every deployment,
+// and Next.js does not allow it to be overridden, so this cannot weaken a
+// deployed app. The limiter itself is unchanged; only the dev path opts out.
+const SKIP_RATE_LIMIT = process.env.NODE_ENV !== "production";
+
 export async function checkLoginRateLimit(): Promise<RateLimitResult> {
+  if (SKIP_RATE_LIMIT) return { allowed: true };
   return checkRateLimitForKey(await clientIpHash());
 }
 
 export async function recordFailedLogin(): Promise<void> {
+  if (SKIP_RATE_LIMIT) return;
   await recordFailureForKey(await clientIpHash());
 }
 

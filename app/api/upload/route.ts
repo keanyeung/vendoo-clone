@@ -1,11 +1,12 @@
 import { isAuthenticated } from "@/lib/auth";
 import {
+  deletePhoto,
   isAllowedMimeType,
   MAX_FILE_BYTES,
   MAX_FILES,
   uploadPhoto,
 } from "@/lib/storage";
-import { deletePhoto } from "@/lib/storage";
+import { isAppPhotoUrl } from "@/lib/photos";
 
 export const runtime = "nodejs";
 
@@ -130,8 +131,8 @@ export async function DELETE(request: Request): Promise<Response> {
     );
   }
 
-  const allowedPublicPrefix = `${supabaseUrl}/storage/v1/object/public/`;
-  if (!body.url.startsWith(allowedPublicPrefix)) {
+  const storageBucket = process.env.SUPABASE_STORAGE_BUCKET ?? "item-photos";
+  if (!isAppPhotoUrl(body.url, supabaseUrl, storageBucket)) {
     return Response.json(
       { error: "A photo URL is not from the app's own storage." },
       { status: 400 },

@@ -19,3 +19,16 @@ export const STATUS_STYLES = {
   ItemDto["status"],
   { label: string; className: string }
 >;
+
+export const DETAIL_STATUS_STYLES = {
+  DRAFT: STATUS_STYLES.DRAFT,
+  LISTED: {
+    label: "Listed",
+    className:
+      "bg-sky-100 text-sky-800 dark:bg-sky-400/15 dark:text-sky-300",
+  },
+  SOLD: STATUS_STYLES.SOLD,
+} satisfies Record<
+  ItemDto["status"],
+  { label: string; className: string }
+>;

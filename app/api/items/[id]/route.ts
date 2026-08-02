@@ -7,6 +7,7 @@ import {
   ItemMutationSchema,
   type ItemMutationInput,
 } from "@/lib/item-schema";
+import { getRemovedPhotoUrls, isAppPhotoUrl } from "@/lib/photos";
 import { deletePhoto } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -42,12 +43,56 @@ export async function PATCH(
 
   const mutation: ItemMutationInput = parsed.data;
 
+  if (mutation.action === "update" && mutation.data.photos !== undefined) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl) {
+      return Response.json(
+        {
+          error:
+            "Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL",
+        },
+        { status: 500 },
+      );
+    }
+
+    const storageBucket = process.env.SUPABASE_STORAGE_BUCKET ?? "item-photos";
+    if (
+      mutation.data.photos.some(
+        (photoUrl: string): boolean =>
+          !isAppPhotoUrl(photoUrl, supabaseUrl, storageBucket),
+      )
+    ) {
+      return Response.json(
+        { error: "A photo URL is not from the app's own storage." },
+        { status: 400 },
+      );
+    }
+  }
+
   try {
     switch (mutation.action) {
-      case "update":
+      case "update": {
+        const originalPhotos =
+          mutation.data.photos === undefined
+            ? null
+            : await prisma.item.findUnique({
+                where: { id },
+                select: { photos: true },
+              });
+
+        if (mutation.data.photos !== undefined && originalPhotos === null) {
+          return Response.json(
+            { error: "Item not found." },
+            { status: 404 },
+          );
+        }
+
         await prisma.item.update({
           where: { id },
           data: {
+            ...(mutation.data.photos === undefined
+              ? {}
+              : { photos: mutation.data.photos }),
             title: mutation.data.title,
             summary: mutation.data.summary,
             description: mutation.data.description,
@@ -68,8 +113,48 @@ export async function PATCH(
           },
           select: { id: true },
         });
+
+        if (mutation.data.photos !== undefined && originalPhotos !== null) {
+          const removedPhotoUrls = getRemovedPhotoUrls(
+            originalPhotos.photos,
+            mutation.data.photos,
+          );
+
+          for (const photoUrl of removedPhotoUrls) {
+            try {
+              const isStillReferenced =
+                (await prisma.item.count({
+                  where: { photos: { has: photoUrl } },
+                })) > 0;
+              if (!isStillReferenced) await deletePhoto(photoUrl);
+            } catch {
+              // The item update is authoritative. Failed object cleanup can be retried later.
+            }
+          }
+        }
         break;
-      case "mark_sold":
+      }
+      case "mark_sold": {
+        const item = await prisma.item.findUnique({
+          where: { id },
+          select: { status: true },
+        });
+        if (item === null) {
+          return Response.json(
+            { error: "Item not found." },
+            { status: 404 },
+          );
+        }
+        if (item.status === "SOLD") {
+          return Response.json(
+            {
+              error:
+                "This item is already marked sold. Use edit_sale to change the recorded sale.",
+            },
+            { status: 409 },
+          );
+        }
+
         await prisma.item.update({
           where: { id },
           data: {
@@ -82,6 +167,37 @@ export async function PATCH(
           select: { id: true },
         });
         break;
+      }
+      case "edit_sale": {
+        const item = await prisma.item.findUnique({
+          where: { id },
+          select: { status: true },
+        });
+        if (item === null) {
+          return Response.json(
+            { error: "Item not found." },
+            { status: 404 },
+          );
+        }
+        if (item.status !== "SOLD") {
+          return Response.json(
+            { error: "This item is not marked sold yet." },
+            { status: 409 },
+          );
+        }
+
+        await prisma.item.update({
+          where: { id },
+          data: {
+            soldPrice: mutation.data.soldPrice,
+            soldPlatform: mutation.data.soldPlatform,
+            soldDate: new Date(mutation.data.soldDate),
+            platformFees: mutation.data.platformFees,
+          },
+          select: { id: true },
+        });
+        break;
+      }
       case "set_status": {
         const item = await prisma.item.findUnique({
           where: { id },
@@ -110,6 +226,10 @@ export async function PATCH(
           select: { id: true },
         });
         break;
+      }
+      default: {
+        const exhaustive: never = mutation;
+        throw new Error(`Unhandled item mutation: ${String(exhaustive)}`);
       }
     }
 

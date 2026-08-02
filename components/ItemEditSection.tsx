@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
+import { useItemDetail } from "@/components/item/ItemDetailProvider";
 import { CONDITION_VALUES } from "@/lib/analysis-schema";
 import type { ItemDto } from "@/lib/item-dto";
 import { UpdateItemSchema } from "@/lib/item-schema";
@@ -37,7 +38,7 @@ type FormState = {
 };
 
 const control =
-  "w-full rounded-md border border-black/15 bg-transparent px-3 py-2 text-base outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50";
+  "min-h-11 w-full rounded-md border border-black/15 bg-transparent px-3 py-2 text-base outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/50 sm:min-h-0";
 
 function nullable(value: string): string | null {
   return value.trim() === "" ? null : value;
@@ -83,8 +84,8 @@ export default function ItemEditSection({
   item,
 }: ItemEditSectionProps) {
   const router = useRouter();
+  const { isEditOpen, setEditOpen } = useItemDetail();
   const confirmationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [form, setForm] = useState<FormState>(() => deriveFormState(item));
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -120,12 +121,12 @@ export default function ItemEditSection({
   function handleOpen(): void {
     resetForm();
     setSaved(false);
-    setIsExpanded(true);
+    setEditOpen(true);
   }
 
   function handleCancel(): void {
     resetForm();
-    setIsExpanded(false);
+    setEditOpen(false);
   }
 
   function showConfirmation(): void {
@@ -210,7 +211,7 @@ export default function ItemEditSection({
       }
 
       router.refresh();
-      setIsExpanded(false);
+      setEditOpen(false);
       showConfirmation();
     } catch {
       setSubmitError(
@@ -232,21 +233,24 @@ export default function ItemEditSection({
   ];
 
   return (
-    <section className="mt-8 rounded-xl border border-black/15 p-6 dark:border-white/20">
+    <section
+      id="edit"
+      className="mt-8 scroll-mt-32 rounded-xl border border-black/15 p-6 dark:border-white/20"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Edit</h2>
-          {!isExpanded && (
+          {!isEditOpen && (
             <p className="mt-1 text-sm text-black/60 dark:text-white/60">
               Update this item&apos;s listing and purchase details.
             </p>
           )}
         </div>
-        {!isExpanded && (
+        {!isEditOpen && (
           <button
             type="button"
             onClick={handleOpen}
-            className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium dark:border-white/20"
+            className="min-h-11 rounded-md border border-black/15 px-4 py-2 text-sm font-medium dark:border-white/20 sm:min-h-0"
           >
             Edit item
           </button>
@@ -262,7 +266,7 @@ export default function ItemEditSection({
         </p>
       )}
 
-      {isExpanded && (
+      {isEditOpen && (
         <form
           onSubmit={(event) => void handleSubmit(event)}
           className="mt-6 space-y-6"
@@ -463,7 +467,7 @@ export default function ItemEditSection({
               <button
                 type="button"
                 onClick={() => setSubmitError(null)}
-                className="shrink-0 font-medium"
+                className="min-h-11 shrink-0 font-medium sm:min-h-0"
                 aria-label="Dismiss save error"
               >
                 Dismiss
@@ -475,7 +479,7 @@ export default function ItemEditSection({
             <button
               type="submit"
               disabled={isSaving}
-              className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-h-11 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-0"
             >
               {isSaving ? "Saving…" : "Save"}
             </button>
@@ -483,7 +487,7 @@ export default function ItemEditSection({
               type="button"
               onClick={handleCancel}
               disabled={isSaving}
-              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20"
+              className="min-h-11 rounded-md border border-black/15 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20 sm:min-h-0"
             >
               Cancel
             </button>

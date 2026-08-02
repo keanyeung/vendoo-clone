@@ -4,7 +4,6 @@ import type { ListingCopyController } from "@/components/useListingCopy";
 import { useListingCopy } from "@/components/useListingCopy";
 import type { ItemDto } from "@/lib/item-dto";
 import {
-  EBAY_TITLE_MAX_LENGTH,
   formatPrice,
   LISTING_PLATFORMS,
   PLATFORM_LABELS,
@@ -33,9 +32,9 @@ function CopyListingSectionView({
     <section
       className={`${className} rounded-xl border border-black/15 p-6 dark:border-white/20`}
     >
-      <h2 className="text-lg font-semibold">Post it</h2>
+      <h2 className="text-lg font-semibold">Copy &amp; paste</h2>
       <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-        Copy this, switch to the marketplace app, and paste.
+        Formatted for each marketplace. Paste into their app.
       </p>
 
       <div className="mt-4 flex gap-2" aria-label="Listing platform">
@@ -56,26 +55,46 @@ function CopyListingSectionView({
         ))}
       </div>
 
-      <div className="mt-5">
-        <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-md border border-black/15 bg-black/[.03] p-4 font-sans text-sm leading-6 dark:border-white/20 dark:bg-white/[.04]">
-          {copy.listingText}
-        </pre>
+      <div className="mt-5 space-y-3">
+        <div className="rounded-md border border-black/15 bg-black/[.03] p-4 dark:border-white/20 dark:bg-white/[.04]">
+          <div className="flex items-center justify-between gap-4 text-xs tracking-[0.06em] text-black/60 uppercase dark:text-white/60">
+            <span>Title</span>
+            <span
+              className={
+                copy.sourceTitleExceedsLimit
+                  ? "text-red-600 dark:text-red-400"
+                  : undefined
+              }
+            >
+              {copy.sourceTitleLength} / {copy.titleLimit}
+            </span>
+          </div>
+          <p className="mt-2 text-sm leading-6">{copy.title}</p>
+          {copy.titleWasTruncated && (
+            <p className="mt-2 text-xs text-black/60 dark:text-white/60">
+              Trimmed to fit eBay&apos;s title limit.
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-md border border-black/15 bg-black/[.03] p-4 dark:border-white/20 dark:bg-white/[.04]">
+          <div className="flex items-center justify-between gap-4 text-xs tracking-[0.06em] text-black/60 uppercase dark:text-white/60">
+            <span>Description</span>
+            <span>{copy.descriptionLength} chars</span>
+          </div>
+          <p className="mt-2 max-h-80 overflow-y-auto whitespace-pre-line text-sm leading-6">
+            {copy.listingText}
+          </p>
+        </div>
+
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-xs tracking-[0.06em] text-black/60 uppercase dark:text-white/60">
-              List price
-            </p>
-            <p className="mt-1 text-xl font-semibold">
-              {formatPrice(item.listPrice)}
+            <p className="text-sm font-semibold">
+              Price to enter: {formatPrice(item.listPrice)}
             </p>
             <p className="mt-1 max-w-52 text-xs text-black/60 dark:text-white/60">
               Enter this in the platform&apos;s own price field.
             </p>
-            {copy.selectedPlatform === "EBAY" && (
-              <p className="mt-2 text-xs text-black/60 dark:text-white/60">
-                Title: {copy.title.length}/{EBAY_TITLE_MAX_LENGTH} characters
-              </p>
-            )}
           </div>
 
           {showCopyActions && (
@@ -90,8 +109,8 @@ function CopyListingSectionView({
                 className="inline-flex min-h-11 items-center justify-center rounded-md bg-foreground px-4 text-sm font-medium text-background"
               >
                 {copy.copiedTarget === "listing"
-                  ? "Copied"
-                  : "Copy listing"}
+                  ? "✓ Copied"
+                  : "Copy description"}
               </button>
               <button
                 type="button"
@@ -99,7 +118,7 @@ function CopyListingSectionView({
                 className="inline-flex min-h-11 items-center justify-center rounded-md border border-black/15 px-4 text-sm font-medium dark:border-white/20"
               >
                 {copy.copiedTarget === "title"
-                  ? "Copied"
+                  ? "✓ Copied"
                   : "Copy title only"}
               </button>
             </div>
