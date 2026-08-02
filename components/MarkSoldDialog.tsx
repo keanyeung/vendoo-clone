@@ -22,8 +22,20 @@ import {
   profitTone,
 } from "@/lib/profit-tone";
 
+type MarkSoldItem = Pick<
+  ItemDto,
+  | "id"
+  | "title"
+  | "listPrice"
+  | "purchasePrice"
+  | "soldPrice"
+  | "soldPlatform"
+  | "soldDate"
+  | "platformFees"
+>;
+
 export type MarkSoldDialogProps = {
-  item: ItemDto | null;
+  item: MarkSoldItem | null;
   onClose: () => void;
   onSold: (sale: MarkSoldInput) => void;
   mode?: "create" | "edit";
@@ -94,7 +106,7 @@ function normalizeMoney(value: string): string {
 }
 
 function deriveFormState(
-  item: ItemDto,
+  item: MarkSoldItem,
   mode: "create" | "edit",
 ): FormState {
   if (mode === "edit") {

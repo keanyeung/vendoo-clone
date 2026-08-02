@@ -3,17 +3,15 @@ import type { Metadata } from "next";
 import ListingsFilterBar from "@/components/ListingsFilterBar";
 import ListingsTable from "@/components/ListingsTable";
 import ListingsViewToggle from "@/components/ListingsViewToggle";
-import type { ItemDto } from "@/lib/item-dto";
-import { toItemDtos } from "@/lib/item-dto";
+import ListingsPagination from "@/components/listings/ListingsPagination";
+import type { ListingRowDto } from "@/lib/item-dto";
+import { toListingRowDtos } from "@/lib/item-dto";
 import {
   buildListingQuery,
   carryListingContext,
 } from "@/lib/listing-context";
-import {
-  DEFAULT_SORT,
-  serializeSort,
-  sortItems,
-} from "@/lib/listing-sort";
+import { PAGE_SIZE, paginate } from "@/lib/listing-page";
+import { sortItems } from "@/lib/listing-sort";
 import { STATUS_STYLES } from "@/lib/status-style";
 import { prisma } from "@/lib/db";
 
@@ -29,7 +27,9 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
   currency: "USD",
 });
 
-function ListingCard({ item }: { item: ItemDto }) {
+const MAX_SORT_ITEMS = 2000;
+
+function ListingCard({ item }: { item: ListingRowDto }) {
   const photo = item.photos[0];
   const status = STATUS_STYLES[item.status];
   const metadata = [item.brand, item.size, item.category].filter(
@@ -92,28 +92,69 @@ export default async function ListingsPage(props: {
   }>;
 }) {
   const searchParams = await props.searchParams;
-  const { status, q, sort, view, sortToken, where } =
+  const { status, q, sort, view, page, sortToken, where } =
     buildListingQuery(searchParams);
   // Capture one request-time value so sorting and the hydrated table agree.
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
 
-  const [items, totalItems] = await Promise.all([
-    prisma.item.findMany({ where }),
+  const [items, filteredItems, totalItems] = await Promise.all([
+    prisma.item.findMany({
+      where,
+      select: {
+        id: true,
+        createdAt: true,
+        photos: true,
+        title: true,
+        status: true,
+        brand: true,
+        size: true,
+        category: true,
+        listPrice: true,
+        purchasePrice: true,
+        soldPrice: true,
+        soldPlatform: true,
+        soldDate: true,
+        platformFees: true,
+      },
+      orderBy: { id: "asc" },
+      take: MAX_SORT_ITEMS,
+    }),
+    prisma.item.count({ where }),
     prisma.item.count(),
   ]);
-  const itemDtos = sortItems(toItemDtos(items), sortToken, now);
-  const hasActiveFilters =
-    status !== "" || q !== "" || sort !== serializeSort(DEFAULT_SORT);
-
+  const sortedItems = sortItems(toListingRowDtos(items), sortToken, now);
+  const paginatedItems = paginate(sortedItems, page);
+  const itemDtos = paginatedItems.items;
+  const isTruncated = filteredItems > MAX_SORT_ITEMS;
+  const firstVisibleItem =
+    paginatedItems.total === 0
+      ? 0
+      : (paginatedItems.page - 1) * PAGE_SIZE + 1;
+  const lastVisibleItem =
+    itemDtos.length === 0 ? 0 : firstVisibleItem + itemDtos.length - 1;
+  const visibleRange =
+    itemDtos.length === 0
+      ? "Showing 0"
+      : `Showing ${firstVisibleItem}-${lastVisibleItem}`;
+  const hasListFilters = status !== "" || q !== "";
+  const countLabel =
+    hasListFilters
+      ? `${visibleRange} of ${filteredItems} - ${totalItems} items total`
+      : `${visibleRange} of ${filteredItems} ${filteredItems === 1 ? "item" : "items"}`;
+  const listingContext = {
+    status,
+    q,
+    sort,
+    view,
+    page: paginatedItems.page,
+  };
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 p-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Listings</h1>
         <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          {hasActiveFilters
-            ? `${itemDtos.length} of ${totalItems} items`
-            : `${itemDtos.length} ${itemDtos.length === 1 ? "item" : "items"}`}
+          {countLabel}
         </p>
       </div>
 
@@ -128,6 +169,13 @@ export default async function ListingsPage(props: {
             sort={sort}
           />
         </div>
+      )}
+
+      {isTruncated && (
+        <p className="mt-4 text-sm text-amber-700 dark:text-amber-400">
+          This view is limited to 2,000 matching items. Refine the filters to
+          sort the full result set.
+        </p>
       )}
 
       {totalItems === 0 ? (
@@ -159,24 +207,31 @@ export default async function ListingsPage(props: {
           </Link>
         </section>
       ) : (
-        view === "table" ? (
-          <ListingsTable items={itemDtos} now={now} />
-        ) : (
-          <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {itemDtos.map((item: ItemDto) => (
-              <Link
-                key={item.id}
-                href={carryListingContext(
-                  `/listings/${item.id}`,
-                  searchParams,
-                )}
-                className="rounded-xl transition-colors hover:bg-black/[.03] dark:hover:bg-white/[.04]"
-              >
-                <ListingCard item={item} />
-              </Link>
-            ))}
-          </section>
-        )
+        <>
+          {view === "table" ? (
+            <ListingsTable items={itemDtos} now={now} />
+          ) : (
+            <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {itemDtos.map((item) => (
+                <Link
+                  key={item.id}
+                  href={carryListingContext(
+                    `/listings/${item.id}`,
+                    listingContext,
+                  )}
+                  className="rounded-xl transition-colors hover:bg-black/[.03] dark:hover:bg-white/[.04]"
+                >
+                  <ListingCard item={item} />
+                </Link>
+              ))}
+            </section>
+          )}
+          <ListingsPagination
+            context={listingContext}
+            page={paginatedItems.page}
+            pageCount={paginatedItems.pageCount}
+          />
+        </>
       )}
     </main>
   );

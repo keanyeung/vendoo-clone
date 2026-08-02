@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import MarkSoldDialog from "@/components/MarkSoldDialog";
-import type { ItemDto } from "@/lib/item-dto";
+import type { ListingRowDto } from "@/lib/item-dto";
 import { carryListingContext } from "@/lib/listing-context";
 import {
   daysListed,
@@ -15,7 +15,7 @@ import {
 import { STATUS_STYLES } from "@/lib/status-style";
 
 type ListingsTableProps = {
-  items: ItemDto[];
+  items: ListingRowDto[];
   now: number;
 };
 
@@ -44,13 +44,13 @@ export default function ListingsTable({ items, now }: ListingsTableProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [sellItem, setSellItem] = useState<ItemDto | null>(null);
+  const [sellItem, setSellItem] = useState<ListingRowDto | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const currentSort = parseSort(searchParams.get("sort"));
 
   async function changeStatus(
-    item: ItemDto,
+    item: ListingRowDto,
     status: "DRAFT" | "LISTED",
   ): Promise<void> {
     if (pendingId) return;
@@ -219,7 +219,7 @@ export default function ListingsTable({ items, now }: ListingsTableProps) {
           </tr>
         </thead>
         <tbody>
-          {items.map((item: ItemDto) => {
+          {items.map((item) => {
             const photo = item.photos[0];
             const status = STATUS_STYLES[item.status];
             const listedDays = daysListed(item, now);

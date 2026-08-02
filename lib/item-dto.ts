@@ -32,6 +32,41 @@ export type ItemDto = {
   platformFees: number | null;
 };
 
+export type ListingRowDto = {
+  id: string;
+  createdAt: string;
+  photos: string[];
+  title: string;
+  status: ItemStatus;
+  brand: string | null;
+  size: string | null;
+  category: string | null;
+  listPrice: number;
+  purchasePrice: number;
+  soldPrice: number | null;
+  soldPlatform: Platform | null;
+  soldDate: string | null;
+  platformFees: number | null;
+};
+
+type ListingRow = Pick<
+  Item,
+  | "id"
+  | "createdAt"
+  | "photos"
+  | "title"
+  | "status"
+  | "brand"
+  | "size"
+  | "category"
+  | "listPrice"
+  | "purchasePrice"
+  | "soldPrice"
+  | "soldPlatform"
+  | "soldDate"
+  | "platformFees"
+>;
+
 export function toItemDto(item: Item): ItemDto {
   return {
     id: item.id,
@@ -70,4 +105,28 @@ export function toItemDto(item: Item): ItemDto {
 
 export function toItemDtos(items: Item[]): ItemDto[] {
   return items.map(toItemDto);
+}
+
+export function toListingRowDto(item: ListingRow): ListingRowDto {
+  return {
+    id: item.id,
+    createdAt: item.createdAt.toISOString(),
+    photos: item.photos,
+    title: item.title,
+    status: item.status,
+    brand: item.brand,
+    size: item.size,
+    category: item.category,
+    listPrice: Number(item.listPrice),
+    purchasePrice: Number(item.purchasePrice),
+    soldPrice: item.soldPrice === null ? null : Number(item.soldPrice),
+    soldPlatform: item.soldPlatform,
+    soldDate: item.soldDate === null ? null : item.soldDate.toISOString(),
+    platformFees:
+      item.platformFees === null ? null : Number(item.platformFees),
+  };
+}
+
+export function toListingRowDtos(items: ListingRow[]): ListingRowDto[] {
+  return items.map(toListingRowDto);
 }
