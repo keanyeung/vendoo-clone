@@ -182,8 +182,30 @@ export const ItemMutationSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
+const bulkItemIds = z
+  .array(
+    z.string().trim().min(1, {
+      message: "Item ids cannot be empty.",
+    }),
+  )
+  .min(1, { message: "Select at least one item." })
+  .max(200, { message: "Bulk actions are limited to 200 items at a time." });
+
+export const BulkItemMutationSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("set_status"),
+    ids: bulkItemIds,
+    data: SetStatusSchema,
+  }),
+  z.object({
+    action: z.literal("delete"),
+    ids: bulkItemIds,
+  }),
+]);
+
 export type UpdateItemInput = z.infer<typeof UpdateItemSchema>;
 export type MarkSoldInput = z.infer<typeof MarkSoldSchema>;
 export type EditSaleInput = z.infer<typeof MarkSoldSchema>;
 export type SetStatusInput = z.infer<typeof SetStatusSchema>;
 export type ItemMutationInput = z.infer<typeof ItemMutationSchema>;
+export type BulkItemMutationInput = z.infer<typeof BulkItemMutationSchema>;

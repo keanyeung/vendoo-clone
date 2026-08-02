@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { ItemMutationSchema, MarkSoldSchema } from "./item-schema";
+import {
+  BulkItemMutationSchema,
+  ItemMutationSchema,
+  MarkSoldSchema,
+} from "./item-schema";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -102,6 +106,60 @@ describe("ItemMutationSchema", () => {
       ItemMutationSchema.safeParse({
         action: "delete_sale",
         data: salePayload(),
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("BulkItemMutationSchema", () => {
+  it("accepts valid set_status and delete payloads", () => {
+    expect(
+      BulkItemMutationSchema.safeParse({
+        action: "set_status",
+        ids: ["item-1", "item-2"],
+        data: { status: "DRAFT" },
+      }).success,
+    ).toBe(true);
+    expect(
+      BulkItemMutationSchema.safeParse({
+        action: "delete",
+        ids: ["item-1"],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects an empty ids array", () => {
+    const parsed = BulkItemMutationSchema.safeParse({
+      action: "delete",
+      ids: [],
+    });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) throw new Error("Expected empty ids to fail");
+    expect(parsed.error.issues.map((issue) => issue.message)).toContain(
+      "Select at least one item.",
+    );
+  });
+
+  it("rejects more than 200 ids with a readable message", () => {
+    const parsed = BulkItemMutationSchema.safeParse({
+      action: "set_status",
+      ids: Array.from({ length: 201 }, (_, index) => `item-${index}`),
+      data: { status: "LISTED" },
+    });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) throw new Error("Expected the bulk cap to fail");
+    expect(parsed.error.issues.map((issue) => issue.message)).toContain(
+      "Bulk actions are limited to 200 items at a time.",
+    );
+  });
+
+  it("rejects an unknown action", () => {
+    expect(
+      BulkItemMutationSchema.safeParse({
+        action: "archive",
+        ids: ["item-1"],
       }).success,
     ).toBe(false);
   });

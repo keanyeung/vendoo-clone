@@ -3,12 +3,15 @@ import type { Metadata } from "next";
 import ListingsFilterBar from "@/components/ListingsFilterBar";
 import ListingsTable from "@/components/ListingsTable";
 import ListingsViewToggle from "@/components/ListingsViewToggle";
+import BulkActionBar from "@/components/listings/BulkActionBar";
 import ListingCard from "@/components/listings/ListingCard";
 import ListingsPagination from "@/components/listings/ListingsPagination";
+import ListingsSelectionProvider from "@/components/listings/ListingsSelectionProvider";
 import { toListingRowDtos } from "@/lib/item-dto";
 import { ATTENTION_FILTERS } from "@/lib/listing-filters";
 import {
   buildListingQuery,
+  buildListingsHref,
   carryListingContext,
 } from "@/lib/listing-context";
 import { PAGE_SIZE, paginate } from "@/lib/listing-page";
@@ -108,6 +111,7 @@ export default async function ListingsPage(props: {
     view,
     page: paginatedItems.page,
   };
+  const selectionScopeKey = buildListingsHref(listingContext);
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 p-6">
       <div>
@@ -174,7 +178,7 @@ export default async function ListingsPage(props: {
           </Link>
         </section>
       ) : (
-        <>
+        <ListingsSelectionProvider key={selectionScopeKey}>
           {view === "table" ? (
             <ListingsTable items={itemDtos} now={now} />
           ) : (
@@ -206,7 +210,8 @@ export default async function ListingsPage(props: {
             page={paginatedItems.page}
             pageCount={paginatedItems.pageCount}
           />
-        </>
+          <BulkActionBar />
+        </ListingsSelectionProvider>
       )}
     </main>
   );

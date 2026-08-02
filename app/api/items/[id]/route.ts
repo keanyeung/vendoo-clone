@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 
 import { isAuthenticated } from "@/lib/auth";
+import { cleanupUnreferencedItemPhotos } from "@/lib/item-cleanup";
 import { prisma } from "@/lib/db";
 import {
   formatZodIssues,
@@ -289,14 +290,7 @@ export async function DELETE(
     );
   }
 
-  // The row is the source of truth; a storage orphan is preferable to reporting failure after deletion.
-  for (const photoUrl of photos) {
-    try {
-      await deletePhoto(photoUrl);
-    } catch {
-      // Photo cleanup is best-effort so one failure does not prevent the remaining deletions.
-    }
-  }
+  await cleanupUnreferencedItemPhotos(photos);
 
   return Response.json({ ok: true });
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import ListingRowActions from "@/components/listings/ListingRowActions";
+import { ListingSelectionCheckbox } from "@/components/listings/ListingsSelectionProvider";
 import { computeProfit, type SellableItem } from "@/lib/analytics";
 import type { ListingRowDto } from "@/lib/item-dto";
 import { daysListed } from "@/lib/listing-sort";
@@ -49,7 +50,12 @@ export default function ListingCard({
   const profitClass = PROFIT_TONE_CLASSES[profitTone(projectedProfit)];
 
   return (
-    <article className="group rounded-xl border border-black/15 transition-colors hover:bg-black/[.03] focus-within:border-black/30 dark:border-white/20 dark:hover:bg-white/[.04] dark:focus-within:border-white/35">
+    <article className="group relative rounded-xl border border-black/15 transition-colors hover:bg-black/[.03] focus-within:border-black/30 dark:border-white/20 dark:hover:bg-white/[.04] dark:focus-within:border-white/35">
+      <ListingSelectionCheckbox
+        id={item.id}
+        title={item.title}
+        className="absolute top-2 left-2 z-10"
+      />
       <Link
         href={itemHref}
         aria-label={`View ${item.title}`}

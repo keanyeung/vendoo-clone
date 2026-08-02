@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, type ChangeEvent } from "react";
 import ListingRowActions from "@/components/listings/ListingRowActions";
+import { useListingsSelection } from "@/components/listings/ListingsSelectionProvider";
 import type { ListingRowDto } from "@/lib/item-dto";
 import { carryListingContext } from "@/lib/listing-context";
 import {
@@ -44,6 +46,37 @@ export default function ListingsTable({ items, now }: ListingsTableProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentSort = parseSort(searchParams.get("sort"));
+  const headerCheckboxRef = useRef<HTMLInputElement>(null);
+  const rangeAnchorRef = useRef<string | null>(null);
+  const { selectedIds, toggle, selectRange, selectAll } =
+    useListingsSelection();
+  const pageIds = items.map((item) => item.id);
+  const selectedOnPage = pageIds.filter((id) => selectedIds.has(id)).length;
+  const allOnPageSelected =
+    pageIds.length > 0 && selectedOnPage === pageIds.length;
+  const someOnPageSelected = selectedOnPage > 0 && !allOnPageSelected;
+
+  useEffect(() => {
+    if (headerCheckboxRef.current !== null) {
+      headerCheckboxRef.current.indeterminate = someOnPageSelected;
+    }
+  }, [someOnPageSelected]);
+
+  function onRowSelection(
+    event: ChangeEvent<HTMLInputElement>,
+    id: string,
+  ): void {
+    const anchorId = rangeAnchorRef.current;
+    const isShiftClick =
+      event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey;
+
+    if (isShiftClick && anchorId !== null && pageIds.includes(anchorId)) {
+      selectRange(pageIds, anchorId, id, event.currentTarget.checked);
+    } else {
+      toggle(id);
+    }
+    rangeAnchorRef.current = id;
+  }
 
   function onSort(field: SortField): void {
     const nextDir =
@@ -79,6 +112,18 @@ export default function ListingsTable({ items, now }: ListingsTableProps) {
         <caption className="sr-only">Your listings</caption>
         <thead>
           <tr className="border-b border-black/10 text-left text-black/60 dark:border-white/15 dark:text-white/60">
+            <th scope="col" className="px-2 py-1 font-medium">
+              <label className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center">
+                <input
+                  ref={headerCheckboxRef}
+                  type="checkbox"
+                  checked={allOnPageSelected}
+                  onChange={() => selectAll(pageIds)}
+                  aria-label={`Select all ${items.length} listings on the current page`}
+                  className="size-5 cursor-pointer accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                />
+              </label>
+            </th>
             <th scope="col" className="px-4 py-3 font-medium">Photo</th>
             <th scope="col" aria-sort={ariaSort("title")} className="font-medium">
               <button
@@ -171,6 +216,20 @@ export default function ListingsTable({ items, now }: ListingsTableProps) {
                 onClick={() => router.push(itemHref)}
                 className="cursor-pointer border-b border-black/10 last:border-b-0 hover:bg-black/[.03] dark:border-white/15 dark:hover:bg-white/[.04]"
               >
+                <td
+                  onClick={(event) => event.stopPropagation()}
+                  className="px-2 py-1"
+                >
+                  <label className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.id)}
+                      onChange={(event) => onRowSelection(event, item.id)}
+                      aria-label={`Select ${item.title}`}
+                      className="size-5 cursor-pointer accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                    />
+                  </label>
+                </td>
                 <td className="px-4 py-3">
                   {photo ? (
                     <>
