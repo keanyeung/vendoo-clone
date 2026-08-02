@@ -66,7 +66,6 @@ export default function NewListingPage() {
   const listedTodayRequestRef = useRef(0);
   const hasPhotos = uploadedUrls.length > 0;
   const hasAnalysis = analysis !== null && draft !== null;
-  const isSaved = savedItem !== null;
   const purchasePriceValue =
     draft === null || draft.purchasePrice.trim() === ""
       ? Number.NaN
@@ -516,194 +515,106 @@ export default function NewListingPage() {
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 pt-8 pb-16 sm:px-6">
-      <div className="hidden">
-        <h1 className="text-2xl font-semibold tracking-tight">New listing</h1>
-        <p className="text-sm text-black/60 dark:text-white/60">
-          Copy the text into Facebook, Depop or eBay, then save the item here.
-        </p>
-        <ol
-          aria-label="Listing progress"
-          className="flex flex-wrap items-center gap-2 pt-2 text-xs font-medium text-black/60 dark:text-white/60"
-        >
-          <li
-            aria-current={!hasPhotos ? "step" : undefined}
-            className="text-foreground"
+      <section className="rounded-xl border border-black/15 bg-black/[.02] p-5 dark:border-white/20 dark:bg-white/[.02] sm:p-6">
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-green-100 font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-300"
           >
-            Photos{hasPhotos ? " ✓" : ""}
-          </li>
-          <li aria-hidden="true">›</li>
-          <li
-            aria-current={hasPhotos && !hasAnalysis ? "step" : undefined}
-            className={hasPhotos ? "text-foreground" : undefined}
-          >
-            Analyzed{hasAnalysis ? " ✓" : ""}
-          </li>
-          <li aria-hidden="true">›</li>
-          <li
-            aria-current={hasAnalysis && !isSaved ? "step" : undefined}
-            className={hasAnalysis ? "text-foreground" : undefined}
-          >
-            Post &amp; save{isSaved ? " ✓" : ""}
-          </li>
-        </ol>
-      </div>
+            ✓
+          </span>
+          <h1 className="text-xl font-semibold">Item saved</h1>
+        </div>
 
-      {savedItem ? (
-        <section className="rounded-xl border border-black/15 bg-black/[.02] p-5 dark:border-white/20 dark:bg-white/[.02] sm:p-6">
-          <div className="flex items-center gap-3">
-            <span
+        <div className="mt-5 flex items-center gap-3 rounded-lg border border-black/10 p-3 dark:border-white/15">
+          {savedItem.photos[0] ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={savedItem.photos[0]}
+              alt=""
+              className="size-14 shrink-0 rounded-lg object-cover"
+            />
+          ) : (
+            <div
               aria-hidden="true"
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-green-100 font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-300"
-            >
-              ✓
-            </span>
-            <h1 className="text-xl font-semibold">Item saved</h1>
-          </div>
-
-          <div className="mt-5 flex items-center gap-3 rounded-lg border border-black/10 p-3 dark:border-white/15">
-            {savedItem.photos[0] ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={savedItem.photos[0]}
-                alt=""
-                className="size-14 shrink-0 rounded-lg object-cover"
-              />
-            ) : (
-              <div
-                aria-hidden="true"
-                className="size-14 shrink-0 rounded-lg bg-black/[.05] dark:bg-white/[.06]"
-              />
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{savedItem.title}</p>
-              <p className="mt-1 text-xs leading-5 text-black/55 dark:text-white/55">
-                {savedMeta}
-              </p>
-            </div>
-            <span
-              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${savedStatus.className}`}
-            >
-              {savedStatus.label}
-            </span>
-          </div>
-
-          <dl className="mt-4 grid grid-cols-3 gap-3 rounded-lg border border-black/10 p-4 dark:border-white/15">
-            <div>
-              <dt className="text-[11px] font-medium tracking-[0.06em] text-black/50 uppercase dark:text-white/50">
-                Potential profit
-              </dt>
-              <dd
-                className={`mt-1 text-xl font-semibold ${
-                  potentialProfit === null
-                    ? ""
-                    : potentialProfit >= 0
-                      ? "text-green-700 dark:text-green-400"
-                      : "text-red-700 dark:text-red-400"
-                }`}
-              >
-                {potentialProfit === null
-                  ? "—"
-                  : currency.format(potentialProfit)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-medium tracking-[0.06em] text-black/50 uppercase dark:text-white/50">
-                ROI
-              </dt>
-              <dd className="mt-1 text-xl font-semibold">
-                {potentialRoi === null ? "—" : `${potentialRoi.toFixed(1)}%`}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[11px] font-medium tracking-[0.06em] text-black/50 uppercase dark:text-white/50">
-                Listed today
-              </dt>
-              <dd
-                aria-live="polite"
-                className="mt-1 text-xl font-semibold"
-              >
-                {listedTodayCount ?? "—"}
-              </dd>
-            </div>
-          </dl>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleCreateAnother}
-              className="min-h-11 rounded-md bg-foreground px-4 text-sm font-semibold text-background"
-            >
-              Create another
-            </button>
-            <Link
-              href={`/listings/${savedItem.id}`}
-              className="inline-flex min-h-11 items-center rounded-md border border-black/15 px-4 text-sm font-medium hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
-            >
-              View item
-            </Link>
-            <Link
-              href="/listings"
-              className="inline-flex min-h-11 items-center rounded-md border border-black/15 px-4 text-sm font-medium hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
-            >
-              All listings
-            </Link>
-          </div>
-        </section>
-      ) : (
-        <>
-          <section className="mt-8">
-            <PhotoUploader key={uploaderKey} onChange={handleUploadedUrlsChange} />
-          </section>
-
-          {uploadedUrls.length > 0 && (
-            <section className="mt-8 space-y-4">
-              <button type="button" disabled={isAnalyzing} onClick={() => void handleAnalyze()} className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60">
-                {analysis ? "Re-analyze photos" : "Analyze photos"}
-              </button>
-              {isAnalyzing && (
-                <div aria-live="polite" className="rounded-xl border border-black/15 bg-black/[.03] p-4 dark:border-white/20 dark:bg-white/[.04]">
-                  <p className="font-medium">
-                    Analyzing {uploadedUrls.length} {uploadedUrls.length === 1 ? "photo" : "photos"}…
-                  </p>
-                  <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-                    This usually takes 15–30 seconds. You can keep this page open while the listing draft is prepared.
-                  </p>
-                </div>
-              )}
-              {errorMessage && (
-                <div role="alert" className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-red-600/30 bg-red-600/[.06] px-3 py-2 text-sm text-red-700 dark:border-red-400/30 dark:text-red-400">
-                  <p>{errorMessage}</p>
-                  <div className="flex shrink-0 gap-3 font-medium">
-                    <button type="button" disabled={isAnalyzing} onClick={() => void handleAnalyze()} className="disabled:opacity-60">Try again</button>
-                    <button type="button" onClick={() => setErrorMessage(null)} aria-label="Dismiss analysis error">Dismiss</button>
-                  </div>
-                </div>
-              )}
-            </section>
+              className="size-14 shrink-0 rounded-lg bg-black/[.05] dark:bg-white/[.06]"
+            />
           )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{savedItem.title}</p>
+            <p className="mt-1 text-xs leading-5 text-black/55 dark:text-white/55">
+              {savedMeta}
+            </p>
+          </div>
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${savedStatus.className}`}
+          >
+            {savedStatus.label}
+          </span>
+        </div>
 
-          {analysis && draft && previewItem && (
-            <section className="mt-8 space-y-4">
-              <ItemForm
-                key={analysisKey}
-                draft={draft}
-                fieldErrors={fieldErrors}
-                submitError={submitError}
-                isSaving={isSaving}
-                canSaveListed={canSaveListed}
-                onChange={updateDraft}
-                onSubmit={(status) => void handleSave(status)}
-                onDismissSubmitError={() => setSubmitError(null)}
-              />
-              {usageLine && (
-                <p className="text-xs text-black/60 dark:text-white/60">
-                  {usageLine}
-                </p>
-              )}
-            </section>
-          )}
-        </>
-      )}
+        <dl className="mt-4 grid grid-cols-3 gap-3 rounded-lg border border-black/10 p-4 dark:border-white/15">
+          <div>
+            <dt className="text-[11px] font-medium tracking-[0.06em] text-black/50 uppercase dark:text-white/50">
+              Potential profit
+            </dt>
+            <dd
+              className={`mt-1 text-xl font-semibold ${
+                potentialProfit === null
+                  ? ""
+                  : potentialProfit >= 0
+                    ? "text-green-700 dark:text-green-400"
+                    : "text-red-700 dark:text-red-400"
+              }`}
+            >
+              {potentialProfit === null
+                ? "—"
+                : currency.format(potentialProfit)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-medium tracking-[0.06em] text-black/50 uppercase dark:text-white/50">
+              ROI
+            </dt>
+            <dd className="mt-1 text-xl font-semibold">
+              {potentialRoi === null ? "—" : `${potentialRoi.toFixed(1)}%`}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-medium tracking-[0.06em] text-black/50 uppercase dark:text-white/50">
+              Listed today
+            </dt>
+            <dd
+              aria-live="polite"
+              className="mt-1 text-xl font-semibold"
+            >
+              {listedTodayCount ?? "—"}
+            </dd>
+          </div>
+        </dl>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleCreateAnother}
+            className="min-h-11 rounded-md bg-foreground px-4 text-sm font-semibold text-background"
+          >
+            Create another
+          </button>
+          <Link
+            href={`/listings/${savedItem.id}`}
+            className="inline-flex min-h-11 items-center rounded-md border border-black/15 px-4 text-sm font-medium hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
+          >
+            View item
+          </Link>
+          <Link
+            href="/listings"
+            className="inline-flex min-h-11 items-center rounded-md border border-black/15 px-4 text-sm font-medium hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
+          >
+            All listings
+          </Link>
+        </div>
+      </section>
     </main>
   );
 }

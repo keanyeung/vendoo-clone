@@ -1,12 +1,19 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import type { ItemStatus, Prisma } from "@prisma/client";
 import ListingsFilterBar from "@/components/ListingsFilterBar";
 import ListingsTable from "@/components/ListingsTable";
 import ListingsViewToggle from "@/components/ListingsViewToggle";
 import type { ItemDto } from "@/lib/item-dto";
 import { toItemDtos } from "@/lib/item-dto";
-import { parseSort, sortItems } from "@/lib/listing-sort";
+import {
+  buildListingQuery,
+  carryListingContext,
+} from "@/lib/listing-context";
+import {
+  DEFAULT_SORT,
+  serializeSort,
+  sortItems,
+} from "@/lib/listing-sort";
 import { STATUS_STYLES } from "@/lib/status-style";
 import { prisma } from "@/lib/db";
 
@@ -21,28 +28,6 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
 });
-
-type SortValue = "newest" | "oldest" | "price-high" | "price-low";
-
-function firstSearchParam(
-  value: string | string[] | undefined,
-): string {
-  if (Array.isArray(value)) return value[0] ?? "";
-  return value ?? "";
-}
-
-function isItemStatus(value: string): value is ItemStatus {
-  return value === "DRAFT" || value === "LISTED" || value === "SOLD";
-}
-
-function isSortValue(value: string): value is SortValue {
-  return (
-    value === "newest" ||
-    value === "oldest" ||
-    value === "price-high" ||
-    value === "price-low"
-  );
-}
 
 function ListingCard({ item }: { item: ItemDto }) {
   const photo = item.photos[0];
@@ -107,41 +92,26 @@ export default async function ListingsPage(props: {
   }>;
 }) {
   const searchParams = await props.searchParams;
-  const statusParam = firstSearchParam(searchParams.status);
-  const q = firstSearchParam(searchParams.q).trim();
-  const sortParam = firstSearchParam(searchParams.sort);
-  const viewParam = firstSearchParam(searchParams.view);
-  const status = isItemStatus(statusParam) ? statusParam : "";
-  const sort: SortValue = isSortValue(sortParam) ? sortParam : "newest";
-  const view: "grid" | "table" =
-    viewParam === "table" ? "table" : "grid";
+  const { status, q, sort, view, sortToken, where } =
+    buildListingQuery(searchParams);
   // Capture one request-time value so sorting and the hydrated table agree.
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
-
-  const where: Prisma.ItemWhereInput = {};
-  if (status) where.status = status;
-  if (q) {
-    where.OR = [
-      { title: { contains: q, mode: "insensitive" } },
-      { brand: { contains: q, mode: "insensitive" } },
-      { category: { contains: q, mode: "insensitive" } },
-    ];
-  }
 
   const [items, totalItems] = await Promise.all([
     prisma.item.findMany({ where }),
     prisma.item.count(),
   ]);
-  const itemDtos = sortItems(toItemDtos(items), parseSort(sortParam), now);
-  const filtersActive = status !== "" || q !== "";
+  const itemDtos = sortItems(toItemDtos(items), sortToken, now);
+  const hasActiveFilters =
+    status !== "" || q !== "" || sort !== serializeSort(DEFAULT_SORT);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 p-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Listings</h1>
         <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          {filtersActive
+          {hasActiveFilters
             ? `${itemDtos.length} of ${totalItems} items`
             : `${itemDtos.length} ${itemDtos.length === 1 ? "item" : "items"}`}
         </p>
@@ -155,7 +125,7 @@ export default async function ListingsPage(props: {
             view={view}
             status={status}
             q={q}
-            sort={sortParam}
+            sort={sort}
           />
         </div>
       )}
@@ -196,7 +166,10 @@ export default async function ListingsPage(props: {
             {itemDtos.map((item: ItemDto) => (
               <Link
                 key={item.id}
-                href={`/listings/${item.id}`}
+                href={carryListingContext(
+                  `/listings/${item.id}`,
+                  searchParams,
+                )}
                 className="rounded-xl transition-colors hover:bg-black/[.03] dark:hover:bg-white/[.04]"
               >
                 <ListingCard item={item} />

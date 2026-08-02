@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import MarkSoldDialog from "@/components/MarkSoldDialog";
 import type { ItemDto } from "@/lib/item-dto";
+import { carryListingContext } from "@/lib/listing-context";
 import {
   daysListed,
   parseSort,
@@ -222,11 +223,15 @@ export default function ListingsTable({ items, now }: ListingsTableProps) {
             const photo = item.photos[0];
             const status = STATUS_STYLES[item.status];
             const listedDays = daysListed(item, now);
+            const itemHref = carryListingContext(
+              `/listings/${item.id}`,
+              searchParams,
+            );
 
             return (
               <tr
                 key={item.id}
-                onClick={() => router.push(`/listings/${item.id}`)}
+                onClick={() => router.push(itemHref)}
                 className="cursor-pointer border-b border-black/10 last:border-b-0 hover:bg-black/[.03] dark:border-white/15 dark:hover:bg-white/[.04]"
               >
                 <td className="px-4 py-3">
@@ -245,7 +250,7 @@ export default function ListingsTable({ items, now }: ListingsTableProps) {
                 </td>
                 <td className="max-w-64 px-4 py-3">
                   <Link
-                    href={`/listings/${item.id}`}
+                    href={itemHref}
                     onClick={(event) => event.stopPropagation()}
                     className="block truncate font-medium hover:underline"
                   >

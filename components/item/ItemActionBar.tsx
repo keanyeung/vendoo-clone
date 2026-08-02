@@ -6,11 +6,22 @@ import { useEffect, useRef, useState } from "react";
 
 import { useItemDetail } from "@/components/item/ItemDetailProvider";
 import type { ItemDto } from "@/lib/item-dto";
+import {
+  buildListingsHref,
+  carryListingContext,
+} from "@/lib/listing-context";
 import { DETAIL_STATUS_STYLES } from "@/lib/status-style";
 
 type StatusAction = {
   buttonLabel: string;
   nextStatus: "DRAFT" | "LISTED";
+};
+
+export type ItemListNavigation = {
+  previousId: string | null;
+  nextId: string | null;
+  position: number | null;
+  total: number;
 };
 
 const statusActions = {
@@ -51,7 +62,15 @@ async function readError(
   return message;
 }
 
-export function ItemActionBar({ item }: { item: ItemDto }) {
+export function ItemActionBar({
+  item,
+  from = null,
+  navigation = null,
+}: {
+  item: ItemDto;
+  from?: string | null;
+  navigation?: ItemListNavigation | null;
+}) {
   const router = useRouter();
   const { setSellOpen } = useItemDetail();
   const menuContainerRef = useRef<HTMLDivElement>(null);
@@ -63,6 +82,22 @@ export function ItemActionBar({ item }: { item: ItemDto }) {
   const [error, setError] = useState<string | null>(null);
   const status = DETAIL_STATUS_STYLES[item.status];
   const statusAction = statusActions[item.status];
+  const contextParams = { from: from ?? undefined };
+  const backHref = from ? buildListingsHref(contextParams) : "/listings";
+  const editHref = from
+    ? carryListingContext(`/listings/${item.id}/edit`, contextParams)
+    : `/listings/${item.id}/edit`;
+  const previousHref =
+    from && navigation?.previousId
+      ? carryListingContext(
+          `/listings/${navigation.previousId}`,
+          contextParams,
+        )
+      : null;
+  const nextHref =
+    from && navigation?.nextId
+      ? carryListingContext(`/listings/${navigation.nextId}`, contextParams)
+      : null;
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -98,6 +133,43 @@ export function ItemActionBar({ item }: { item: ItemDto }) {
     if (isDeleteOpen && !dialog.open) dialog.showModal();
     else if (!isDeleteOpen && dialog.open) dialog.close();
   }, [isDeleteOpen]);
+
+  useEffect(() => {
+    if (!from || navigation === null) return;
+
+    function handleListNavigationKey(event: KeyboardEvent): void {
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.matches("input, textarea, select") || target.isContentEditable)
+      ) {
+        return;
+      }
+
+      const href =
+        event.key === "["
+          ? previousHref
+          : event.key === "]"
+            ? nextHref
+            : null;
+      if (href === null) return;
+
+      event.preventDefault();
+      router.push(href);
+    }
+
+    document.addEventListener("keydown", handleListNavigationKey);
+    return () => document.removeEventListener("keydown", handleListNavigationKey);
+  }, [from, navigation, nextHref, previousHref, router]);
 
   function scrollToSellSection(): void {
     requestAnimationFrame(() => {
@@ -162,7 +234,7 @@ export function ItemActionBar({ item }: { item: ItemDto }) {
       }
 
       // Leave the deleted detail route before refreshing the listings grid.
-      router.push("/listings");
+      router.push(backHref);
       router.refresh();
     } catch {
       setError(
@@ -180,9 +252,9 @@ export function ItemActionBar({ item }: { item: ItemDto }) {
 
   return (
     <div className="sticky top-15 z-[9] border-b border-black/10 bg-background/90 backdrop-blur-sm dark:border-white/15">
-      <div className="mx-auto flex min-h-15 w-full max-w-[1120px] items-center gap-1.5 px-4 py-2 sm:gap-2 sm:px-6">
+      <div className="mx-auto flex min-h-15 w-full max-w-[1120px] flex-wrap items-center gap-1.5 px-4 py-2 sm:gap-2 sm:px-6">
         <Link
-          href="/listings"
+          href={backHref}
           aria-label="Back to listings"
           className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white sm:w-auto sm:justify-start"
         >
@@ -194,6 +266,62 @@ export function ItemActionBar({ item }: { item: ItemDto }) {
           aria-hidden="true"
           className="hidden h-5 w-px shrink-0 bg-black/15 dark:bg-white/20 sm:block"
         />
+
+        {from && navigation !== null && (
+          <nav
+            aria-label="Items in current listings view"
+            className="order-last flex w-full basis-full items-center justify-center border-t border-black/10 pt-2 dark:border-white/15 sm:order-none sm:w-auto sm:basis-auto sm:border-t-0 sm:pt-0"
+          >
+            {previousHref === null ? (
+              <button
+                type="button"
+                disabled
+                aria-label="Previous item in listings"
+                className="inline-flex min-h-11 min-w-11 cursor-not-allowed items-center justify-center rounded-md text-black/30 dark:text-white/30"
+              >
+                <span aria-hidden="true">←</span>
+              </button>
+            ) : (
+              <Link
+                href={previousHref}
+                aria-label="Previous item in listings"
+                title="Previous item ([)"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md hover:bg-black/[.04] dark:hover:bg-white/[.06]"
+              >
+                <span aria-hidden="true">←</span>
+              </Link>
+            )}
+            <span className="min-w-16 text-center text-xs tabular-nums text-black/60 dark:text-white/60">
+              <span aria-hidden="true">
+                {navigation.position ?? "—"} of {navigation.total}
+              </span>
+              <span className="sr-only">
+                {navigation.position === null
+                  ? `Current item is not in this list of ${navigation.total} items`
+                  : `Item ${navigation.position} of ${navigation.total}`}
+              </span>
+            </span>
+            {nextHref === null ? (
+              <button
+                type="button"
+                disabled
+                aria-label="Next item in listings"
+                className="inline-flex min-h-11 min-w-11 cursor-not-allowed items-center justify-center rounded-md text-black/30 dark:text-white/30"
+              >
+                <span aria-hidden="true">→</span>
+              </button>
+            ) : (
+              <Link
+                href={nextHref}
+                aria-label="Next item in listings"
+                title="Next item (])"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md hover:bg-black/[.04] dark:hover:bg-white/[.06]"
+              >
+                <span aria-hidden="true">→</span>
+              </Link>
+            )}
+          </nav>
+        )}
 
         <h1 className="min-w-0 flex-1 truncate text-sm font-semibold sm:text-base">
           {item.title}
@@ -216,7 +344,7 @@ export function ItemActionBar({ item }: { item: ItemDto }) {
             </button>
           )}
           <Link
-            href={`/listings/${item.id}/edit`}
+            href={editHref}
             className="hidden min-h-11 items-center rounded-md border border-black/15 px-3.5 text-sm font-medium hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06] sm:inline-flex"
           >
             Edit
@@ -242,7 +370,7 @@ export function ItemActionBar({ item }: { item: ItemDto }) {
                 className="absolute right-0 top-full mt-2 w-60 overflow-hidden rounded-lg border border-black/15 bg-background p-1.5 shadow-xl dark:border-white/20"
               >
                 <Link
-                  href={`/listings/${item.id}/edit`}
+                  href={editHref}
                   role="menuitem"
                   onClick={(event) => {
                     if (isPending) {

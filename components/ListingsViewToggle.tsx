@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { parseSort, serializeSort } from "@/lib/listing-sort";
 
 type ListingsViewToggleProps = {
   view: "grid" | "table";
@@ -16,7 +17,7 @@ export default function ListingsViewToggle({
   const baseParams = new URLSearchParams();
   if (status) baseParams.set("status", status);
   if (q) baseParams.set("q", q);
-  if (sort) baseParams.set("sort", sort);
+  baseParams.set("sort", serializeSort(parseSort(sort)));
 
   const cardsQuery = baseParams.toString();
   const tableParams = new URLSearchParams(baseParams);

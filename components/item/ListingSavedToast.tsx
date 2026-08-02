@@ -3,28 +3,35 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { carryListingContext } from "@/lib/listing-context";
+
 export function ListingSavedToast({
   itemId,
   show,
+  from = null,
 }: {
   itemId: string;
   show: boolean;
+  from?: string | null;
 }) {
   const router = useRouter();
   const [visible, setVisible] = useState<boolean>(show);
+  const cleanHref = from
+    ? carryListingContext(`/listings/${itemId}`, { from })
+    : `/listings/${itemId}`;
 
   useEffect(() => {
     if (!show) return;
     const timer = setTimeout((): void => {
       setVisible(false);
-      router.replace(`/listings/${itemId}`, { scroll: false });
+      router.replace(cleanHref, { scroll: false });
     }, 4000);
     return () => clearTimeout(timer);
-  }, [itemId, router, show]);
+  }, [cleanHref, router, show]);
 
   function dismiss(): void {
     setVisible(false);
-    router.replace(`/listings/${itemId}`, { scroll: false });
+    router.replace(cleanHref, { scroll: false });
   }
 
   if (!visible) return null;

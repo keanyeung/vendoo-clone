@@ -90,15 +90,22 @@ function depopHashtags(item: ItemDto): string {
     .join(" ");
 }
 
-// Every platform shares one concise body: a one-sentence summary, then a details
-// block (condition + flaws, then size when known), plus optional platform extras.
-// The title is intentionally excluded because it is copied on its own; price is
-// excluded because each platform has its own price field.
+export function getListingBody(
+  item: Pick<ItemDto, "description" | "summary">,
+): string {
+  if (hasValue(item.description)) return item.description.trim();
+  return hasValue(item.summary) ? item.summary.trim() : "";
+}
+
+// Every platform shares one listing body, then a details block (condition +
+// flaws, then size when known), plus optional platform extras. The title is
+// intentionally excluded because it is copied on its own; price is excluded
+// because each platform has its own price field.
 function formatMarketplace(
   item: ItemDto,
   options: { pickup?: boolean; hashtags?: boolean } = {},
 ): string {
-  const summary = hasValue(item.summary) ? item.summary.trim() : "";
+  const listingBody = getListingBody(item);
 
   const detailLines: string[] = [];
   const condition = conditionLine(item);
@@ -106,7 +113,7 @@ function formatMarketplace(
   if (hasValue(item.size)) detailLines.push(`Size: ${item.size}`);
   if (options.pickup) detailLines.push(FB_PICKUP_DETAILS);
 
-  const blocks: string[] = [summary, detailLines.join("\n")];
+  const blocks: string[] = [listingBody, detailLines.join("\n")];
   if (options.hashtags) {
     const hashtags = depopHashtags(item);
     if (hashtags.length > 0) blocks.push(hashtags);
