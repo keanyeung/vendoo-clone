@@ -38,6 +38,8 @@ function makeItem(overrides: Partial<ItemDto> = {}): ItemDto {
     soldPlatform: null,
     soldDate: null,
     platformFees: null,
+    shippingCost: null,
+    postings: [],
     ...overrides,
   };
 }

@@ -74,6 +74,18 @@ export default function ItemForm({
   const [newKeyword, setNewKeyword] = useState("");
   const keywords = keywordValues(draft.keywords);
   const purchasePriceMissing = draft.purchasePrice.trim() === "";
+  const aiPriceReference =
+    draft.suggestedPrice !== null &&
+    draft.priceLow !== null &&
+    draft.priceHigh !== null &&
+    draft.aiConfidence !== null
+      ? {
+          suggestedPrice: draft.suggestedPrice,
+          priceLow: draft.priceLow,
+          priceHigh: draft.priceHigh,
+          confidence: draft.aiConfidence,
+        }
+      : null;
   const attributeSummary = [draft.brand, draft.category, draft.size]
     .map((value: string): string => value.trim())
     .filter((value: string): boolean => value !== "")
@@ -202,17 +214,21 @@ export default function ItemForm({
             />
           </div>
           <ErrorText name="listPrice" errors={fieldErrors} />
-          <div className="rounded-md border border-black/10 bg-black/[.025] p-3 dark:border-white/15 dark:bg-white/[.035]">
-            <p className="text-xs font-semibold">
-              AI suggests {money.format(draft.suggestedPrice)} · range{" "}
-              {money.format(draft.priceLow)}–{money.format(draft.priceHigh)} ·{" "}
-              <span className="capitalize">{draft.aiConfidence}</span>{" "}
-              confidence
-            </p>
-            <p className="mt-1 text-xs leading-5 text-black/60 dark:text-white/60">
-              {firstTwoSentences(draft.priceReasoning)}
-            </p>
-          </div>
+          {aiPriceReference !== null && (
+            <div className="rounded-md border border-black/10 bg-black/[.025] p-3 dark:border-white/15 dark:bg-white/[.035]">
+              <p className="text-xs font-semibold">
+                AI suggests {money.format(aiPriceReference.suggestedPrice)} · range{" "}
+                {money.format(aiPriceReference.priceLow)}–{money.format(aiPriceReference.priceHigh)} ·{" "}
+                <span className="capitalize">{aiPriceReference.confidence}</span>{" "}
+                confidence
+              </p>
+              {draft.priceReasoning !== null && (
+                <p className="mt-1 text-xs leading-5 text-black/60 dark:text-white/60">
+                  {firstTwoSentences(draft.priceReasoning)}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-1">
@@ -286,13 +302,15 @@ export default function ItemForm({
               </option>
             ))}
           </select>
-          <p className="text-xs text-black/60 dark:text-white/60">
-            AI read this as{" "}
-            <strong className="font-semibold">
-              {conditionLabel(draft.aiCondition)}
-            </strong>{" "}
-            from the photos.
-          </p>
+          {draft.aiCondition !== null && (
+            <p className="text-xs text-black/60 dark:text-white/60">
+              AI read this as{" "}
+              <strong className="font-semibold">
+                {conditionLabel(draft.aiCondition)}
+              </strong>{" "}
+              from the photos.
+            </p>
+          )}
           <ErrorText name="condition" errors={fieldErrors} />
         </div>
       </div>
@@ -440,14 +458,16 @@ export default function ItemForm({
         </div>
       </section>
 
-      <details className="hidden rounded-lg border border-black/15 bg-black/[.02] dark:border-white/15 dark:bg-white/[.025] lg:block">
-        <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-medium">
-          Why this price?
-        </summary>
-        <p className="px-4 pb-4 text-sm leading-6 text-black/60 dark:text-white/60">
-          {draft.priceReasoning}
-        </p>
-      </details>
+      {draft.priceReasoning !== null && (
+        <details className="hidden rounded-lg border border-black/15 bg-black/[.02] dark:border-white/15 dark:bg-white/[.025] lg:block">
+          <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-medium">
+            Why this price?
+          </summary>
+          <p className="px-4 pb-4 text-sm leading-6 text-black/60 dark:text-white/60">
+            {draft.priceReasoning}
+          </p>
+        </details>
+      )}
 
       {submitError && (
         <div

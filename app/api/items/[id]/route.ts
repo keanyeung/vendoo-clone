@@ -77,7 +77,7 @@ export async function PATCH(
   const mutation: ItemMutationInput = parsed.data;
 
   const updatedPhotos =
-    mutation.action === "update"
+    mutation.action === "update" || mutation.action === "apply_analysis"
       ? mutation.data.photos
       : mutation.action === "update_draft"
         ? mutation.data.photos
@@ -111,7 +111,8 @@ export async function PATCH(
 
   try {
     switch (mutation.action) {
-      case "update": {
+      case "update":
+      case "apply_analysis": {
         const originalPhotos =
           mutation.data.photos === undefined
             ? null
@@ -150,6 +151,15 @@ export async function PATCH(
                 ? null
                 : new Date(mutation.data.purchaseDate),
             notes: mutation.data.notes,
+            ...(mutation.action === "apply_analysis"
+              ? {
+                  suggestedPrice: mutation.data.suggestedPrice,
+                  priceLow: mutation.data.priceLow,
+                  priceHigh: mutation.data.priceHigh,
+                  priceReasoning: mutation.data.priceReasoning,
+                  aiConfidence: mutation.data.aiConfidence,
+                }
+              : {}),
           },
           select: { id: true },
         });
@@ -225,6 +235,14 @@ export async function PATCH(
         await cleanupRemovedPhotos(item.photos, mutation.data.photos);
         break;
       }
+      case "patch_fields": {
+        await prisma.item.update({
+          where: { id },
+          data: mutation.data,
+          select: { id: true },
+        });
+        break;
+      }
       case "mark_sold": {
         const item = await prisma.item.findUnique({
           where: { id },
@@ -246,17 +264,36 @@ export async function PATCH(
           );
         }
 
-        await prisma.item.update({
-          where: { id },
-          data: {
-            soldPrice: mutation.data.soldPrice,
-            soldPlatform: mutation.data.soldPlatform,
-            soldDate: new Date(mutation.data.soldDate),
-            platformFees: mutation.data.platformFees,
-            status: "SOLD",
-          },
-          select: { id: true },
-        });
+        await prisma.$transaction([
+          prisma.item.update({
+            where: { id },
+            data: {
+              soldPrice: mutation.data.soldPrice,
+              soldPlatform: mutation.data.soldPlatform,
+              soldDate: new Date(mutation.data.soldDate),
+              platformFees: mutation.data.platformFees,
+              shippingCost: mutation.data.shippingCost,
+              status: "SOLD",
+            },
+            select: { id: true },
+          }),
+          prisma.itemPosting.upsert({
+            where: {
+              itemId_platform: {
+                itemId: id,
+                platform: mutation.data.soldPlatform,
+              },
+            },
+            create: {
+              itemId: id,
+              platform: mutation.data.soldPlatform,
+            },
+            update: {
+              postedAt: new Date(),
+              removedAt: null,
+            },
+          }),
+        ]);
         break;
       }
       case "edit_sale": {
@@ -284,6 +321,7 @@ export async function PATCH(
             soldPlatform: mutation.data.soldPlatform,
             soldDate: new Date(mutation.data.soldDate),
             platformFees: mutation.data.platformFees,
+            shippingCost: mutation.data.shippingCost,
           },
           select: { id: true },
         });
@@ -355,6 +393,7 @@ export async function PATCH(
                   soldPlatform: null,
                   soldDate: null,
                   platformFees: null,
+                  shippingCost: null,
                 }
               : {}),
           },

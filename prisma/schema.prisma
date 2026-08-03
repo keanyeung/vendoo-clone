@@ -59,13 +59,14 @@ model Item {
   notes        String?   @db.Text // private notes, never shown in a listing
 
   status    ItemStatus @default(LISTED)
-  draftStep String?    // how far an unfinished /new draft got: photos | analyzed | reviewed
+  draftStep String? // how far an unfinished /new draft got: photos | analyzed | reviewed
 
   // Sale details (populated when the item sells).
   soldPrice    Decimal?  @db.Decimal(10, 2)
   soldPlatform Platform?
   soldDate     DateTime?
   platformFees Decimal?  @default(0) @db.Decimal(10, 2)
+  shippingCost Decimal?  @db.Decimal(10, 2)
 
   postings ItemPosting[]
 
@@ -74,15 +75,16 @@ model Item {
   @@index([createdAt])
 }
 
-// One row per marketplace an item has been posted to. Created out-of-band
-// before this model was tracked in the schema, so the shape here mirrors the
-// live table exactly; S15 extends it with the listing url and a removal date.
+// One row per marketplace an item has been posted to. A null removedAt means
+// the posting is currently live; re-posting reuses the same history row.
 model ItemPosting {
-  id       String   @id @default(cuid())
-  itemId   String
-  item     Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  platform Platform
-  postedAt DateTime @default(now())
+  id        String    @id @default(cuid())
+  itemId    String
+  item      Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  platform  Platform
+  postedAt  DateTime  @default(now())
+  url       String?
+  removedAt DateTime?
 
   @@unique([itemId, platform])
   @@index([itemId])

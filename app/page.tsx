@@ -28,6 +28,8 @@ function attentionPhrase(entry: AttentionItem): string {
       return `${count} ${count === 1 ? "listing" : "listings"} going stale`;
     case "missing_fees":
       return `${count} ${count === 1 ? "sale" : "sales"} missing fees`;
+    case "listed_unposted":
+      return `${count} listed ${count === 1 ? "item" : "items"} not posted`;
   }
 }
 
@@ -46,7 +48,7 @@ export default async function Home() {
   // and an unused directive is itself a lint warning.
   const now = new Date();
 
-  const items = await prisma.item.findMany();
+  const items = await prisma.item.findMany({ include: { postings: true } });
   const summary = computeDashboard(toItemDtos(items), now);
 
   return (

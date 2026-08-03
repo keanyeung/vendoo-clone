@@ -9,7 +9,7 @@ import {
 } from "@/lib/listing-text";
 import type { ListingPlatform } from "@/lib/listing-text";
 
-export type CopyTarget = "listing" | "title";
+export type CopyTarget = "listing" | "title" | "complete";
 
 export type ListingCopyController = {
   selectedPlatform: ListingPlatform;
@@ -23,8 +23,9 @@ export type ListingCopyController = {
   copiedTarget: CopyTarget | null;
   error: string | null;
   selectPlatform: (platform: ListingPlatform) => void;
-  copyListing: () => Promise<void>;
-  copyTitle: () => Promise<void>;
+  copyListing: () => Promise<boolean>;
+  copyTitle: () => Promise<boolean>;
+  copyCompleteListing: (platform: ListingPlatform) => Promise<boolean>;
   clearFeedback: () => void;
   dismissError: () => void;
   reset: () => void;
@@ -77,9 +78,12 @@ export function useListingCopy(
     setSelectedPlatform(platform);
   }
 
-  async function copyText(text: string, target: CopyTarget): Promise<void> {
+  async function copyText(
+    text: string,
+    target: CopyTarget,
+  ): Promise<boolean> {
     clearFeedback();
-    if (item === null) return;
+    if (item === null) return false;
 
     try {
       await navigator.clipboard.writeText(text);
@@ -88,11 +92,24 @@ export function useListingCopy(
         setCopiedTarget(null);
         timeoutRef.current = null;
       }, 1600);
+      return true;
     } catch {
       setError(
         "Copying was blocked. You can select the preview text and copy it manually.",
       );
+      return false;
     }
+  }
+
+  function copyCompleteListing(platform: ListingPlatform): Promise<boolean> {
+    if (item === null) return Promise.resolve(false);
+    setSelectedPlatform(platform);
+    const completeTitle =
+      platform === "EBAY"
+        ? truncateTitle(item.title, TITLE_LIMITS.EBAY)
+        : item.title;
+    const completeBody = formatListingText(item, platform);
+    return copyText(`${completeTitle}\n\n${completeBody}`, "complete");
   }
 
   function reset(): void {
@@ -114,6 +131,7 @@ export function useListingCopy(
     selectPlatform,
     copyListing: () => copyText(listingText, "listing"),
     copyTitle: () => copyText(title, "title"),
+    copyCompleteListing,
     clearFeedback,
     dismissError: () => setError(null),
     reset,

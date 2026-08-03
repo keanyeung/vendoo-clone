@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type MouseEvent } from "react";
@@ -38,6 +39,7 @@ type RowCells = {
   soldPrice: string;
   paid: string;
   fees: string;
+  shipping: string;
   profit: string;
   roi: string;
   meta: string;
@@ -67,6 +69,7 @@ function toRowCells(sale: Sale): RowCells {
     soldPrice: formatMoney(sale.soldPrice),
     paid: formatMoney(sale.purchasePrice),
     fees: formatFee(sale.fees),
+    shipping: sale.shipping === null ? "—" : formatFee(sale.shipping),
     profit: formatMoney(sale.profit),
     roi: formatRoi(sale.roiPct),
     meta: [sale.category, sale.size].filter(Boolean).join(" · "),
@@ -77,16 +80,14 @@ function ItemIdentity({ sale, meta }: { sale: Sale; meta: string }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       {sale.photo ? (
-        <>
-          {/* alt="" on purpose: the title beside it already names the row, so describing the
-              photo again would only add duplicate noise for screen readers. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={sale.photo}
-            alt=""
-            className="size-[34px] shrink-0 rounded-md object-cover"
-          />
-        </>
+        <Image
+          src={sale.photo}
+          alt=""
+          width={34}
+          height={34}
+          sizes="34px"
+          className="size-[34px] shrink-0 rounded-md object-cover"
+        />
       ) : (
         <div className="size-[34px] shrink-0 rounded-md bg-black/[.04] dark:bg-white/[.06]" />
       )}
@@ -185,6 +186,9 @@ export default function SoldItemsTable({
   const visible = showAll ? sorted : sorted.slice(0, 8);
   const totals = summarize(sorted);
   const missingFeeCount = sorted.filter((sale) => sale.fees === 0).length;
+  const missingShippingCount = sorted.filter(
+    (sale) => sale.shipping === null,
+  ).length;
   const visibleRows = visible.map((sale) => ({
     sale,
     cells: toRowCells(sale),
@@ -296,6 +300,9 @@ export default function SoldItemsTable({
                   <th scope="col" className="px-3 py-3 text-right font-medium text-black/60 dark:text-white/60">
                     Fees
                   </th>
+                  <th scope="col" className="px-3 py-3 text-right font-medium text-black/60 dark:text-white/60">
+                    Shipping
+                  </th>
                   <SortableHeader
                     field="profit"
                     label="Profit"
@@ -341,6 +348,15 @@ export default function SoldItemsTable({
                     >
                       {cells.fees}
                     </td>
+                    <td
+                      className={`px-3 py-3 text-right whitespace-nowrap ${
+                        sale.shipping === null
+                          ? "text-black/40 dark:text-white/30"
+                          : "text-black/60 dark:text-white/60"
+                      }`}
+                    >
+                      {cells.shipping}
+                    </td>
                     <td className={`px-3 py-3 text-right font-semibold whitespace-nowrap ${profitTone(sale.profit)}`}>
                       {cells.profit}
                     </td>
@@ -363,6 +379,9 @@ export default function SoldItemsTable({
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
                     {formatMoney(totals.fees)}
+                  </td>
+                  <td className="px-3 py-3 text-right whitespace-nowrap">
+                    {formatMoney(totals.shipping)}
                   </td>
                   <td className={`px-3 py-3 text-right whitespace-nowrap ${profitTone(totals.profit)}`}>
                     {formatMoney(totals.profit)}
@@ -401,6 +420,16 @@ export default function SoldItemsTable({
                   >
                     {cells.fees}
                   </dd>
+                  <dt className="text-black/60 dark:text-white/60">Shipping</dt>
+                  <dd
+                    className={`text-right ${
+                      sale.shipping === null
+                        ? "text-black/40 dark:text-white/30"
+                        : "text-black/60 dark:text-white/60"
+                    }`}
+                  >
+                    {cells.shipping}
+                  </dd>
                   <dt className="text-black/60 dark:text-white/60">Profit</dt>
                   <dd className={`text-right font-semibold ${profitTone(sale.profit)}`}>
                     {cells.profit}
@@ -425,6 +454,19 @@ export default function SoldItemsTable({
                     {missingFeeCount === 1
                       ? "1 item needs fees"
                       : `${missingFeeCount} items need fees`}
+                  </Link>
+                </>
+              )}
+              {missingShippingCount > 0 && (
+                <>
+                  {" · "}
+                  <Link
+                    href="/listings?status=SOLD"
+                    className="font-medium text-black underline underline-offset-2 dark:text-white"
+                  >
+                    {missingShippingCount === 1
+                      ? "1 item needs shipping cost"
+                      : `${missingShippingCount} items need shipping costs`}
                   </Link>
                 </>
               )}

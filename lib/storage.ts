@@ -17,6 +17,13 @@ export {
 export type { AllowedMimeType } from "@/lib/upload-limits";
 
 let supabase: SupabaseClient | undefined;
+const STORAGE_LIST_PAGE_SIZE = 100;
+
+export type StoredPhotoObject = {
+  objectPath: string;
+  publicUrl: string;
+  createdAt: string | null;
+};
 
 function getSupabaseClient(): SupabaseClient {
   if (supabase) return supabase;
@@ -86,4 +93,54 @@ export async function deletePhoto(publicUrl: string): Promise<void> {
   if (error) {
     throw new Error(`Supabase photo deletion failed: ${error.message}`);
   }
+}
+
+async function listStoredPhotosInFolder(
+  client: SupabaseClient,
+  bucket: string,
+  prefix: string,
+): Promise<StoredPhotoObject[]> {
+  const photos: StoredPhotoObject[] = [];
+  let offset = 0;
+
+  while (true) {
+    const bucketClient = client.storage.from(bucket);
+    const { data, error } = await bucketClient.list(prefix, {
+      limit: STORAGE_LIST_PAGE_SIZE,
+      offset,
+      sortBy: { column: "name", order: "asc" },
+    });
+
+    if (error) {
+      throw new Error(`Supabase photo listing failed: ${error.message}`);
+    }
+
+    for (const entry of data) {
+      if (entry.name === "") continue;
+
+      const objectPath = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+      if (entry.id === null) {
+        photos.push(
+          ...(await listStoredPhotosInFolder(client, bucket, objectPath)),
+        );
+        continue;
+      }
+
+      photos.push({
+        objectPath,
+        publicUrl: bucketClient.getPublicUrl(objectPath).data.publicUrl,
+        createdAt: entry.created_at,
+      });
+    }
+
+    if (data.length < STORAGE_LIST_PAGE_SIZE) break;
+    offset += data.length;
+  }
+
+  return photos;
+}
+
+export async function listStoredPhotos(): Promise<StoredPhotoObject[]> {
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET ?? "item-photos";
+  return listStoredPhotosInFolder(getSupabaseClient(), bucket, "");
 }

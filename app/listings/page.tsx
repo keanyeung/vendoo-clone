@@ -8,7 +8,10 @@ import ListingCard from "@/components/listings/ListingCard";
 import ListingsPagination from "@/components/listings/ListingsPagination";
 import ListingsSelectionProvider from "@/components/listings/ListingsSelectionProvider";
 import { toListingRowDtos } from "@/lib/item-dto";
-import { ATTENTION_FILTERS } from "@/lib/listing-filters";
+import {
+  ATTENTION_FILTERS,
+  isMissingPostingPlatform,
+} from "@/lib/listing-filters";
 import {
   buildListingQuery,
   buildListingsHref,
@@ -33,7 +36,7 @@ export default async function ListingsPage(props: {
   }>;
 }) {
   const searchParams = await props.searchParams;
-  const { status, q, attention, sort, view, page, sortToken, where } =
+  const { status, q, attention, notOn, sort, view, page, sortToken, where } =
     buildListingQuery(searchParams);
   // Capture one request-time value so sorting and the hydrated table agree.
   // eslint-disable-next-line react-hooks/purity
@@ -57,6 +60,13 @@ export default async function ListingsPage(props: {
         soldPlatform: true,
         soldDate: true,
         platformFees: true,
+        shippingCost: true,
+        postings: {
+          select: {
+            platform: true,
+            removedAt: true,
+          },
+        },
       },
       orderBy: { id: "asc" },
       take: MAX_SORT_ITEMS,
@@ -78,10 +88,13 @@ export default async function ListingsPage(props: {
     (filter) => filter.key === attention,
   );
   const rowDtos = toListingRowDtos(items);
-  const matchingItems = attentionFilter
+  const attentionItems = attentionFilter
     ? rowDtos.filter((item) => attentionFilter.matches(item, now))
     : rowDtos;
-  const filteredItems = attentionFilter
+  const matchingItems = notOn
+    ? attentionItems.filter((item) => isMissingPostingPlatform(item, notOn))
+    : attentionItems;
+  const filteredItems = attentionFilter || notOn
     ? matchingItems.length
     : whereFilteredItems;
   const sortedItems = sortItems(matchingItems, sortToken, now);
@@ -98,7 +111,8 @@ export default async function ListingsPage(props: {
     itemDtos.length === 0
       ? "Showing 0"
       : `Showing ${firstVisibleItem}-${lastVisibleItem}`;
-  const hasListFilters = status !== "" || q !== "" || attention !== "";
+  const hasListFilters =
+    status !== "" || q !== "" || attention !== "" || notOn !== "";
   const countLabel =
     hasListFilters
       ? `${visibleRange} of ${filteredItems} - ${totalItems} items total`
@@ -107,13 +121,14 @@ export default async function ListingsPage(props: {
     status,
     q,
     attention,
+    notOn,
     sort,
     view,
     page: paginatedItems.page,
   };
   const selectionScopeKey = buildListingsHref(listingContext);
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 p-6">
+    <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 xl:px-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Listings</h1>
         <p className="mt-1 text-sm text-black/60 dark:text-white/60">
@@ -125,6 +140,7 @@ export default async function ListingsPage(props: {
         status={status}
         q={q}
         attention={attention}
+        notOn={notOn}
         sort={sort}
         view={view}
         statusCounts={statusCounts}
@@ -137,6 +153,7 @@ export default async function ListingsPage(props: {
             status={status}
             q={q}
             attention={attention}
+            notOn={notOn}
             sort={sort}
           />
         </div>
@@ -182,8 +199,8 @@ export default async function ListingsPage(props: {
           {view === "table" ? (
             <ListingsTable items={itemDtos} now={now} />
           ) : (
-            <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {itemDtos.map((item) => {
+            <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {itemDtos.map((item, index) => {
                 const itemHref = carryListingContext(
                   `/listings/${item.id}`,
                   listingContext,
@@ -200,6 +217,7 @@ export default async function ListingsPage(props: {
                     itemHref={itemHref}
                     editHref={editHref}
                     now={now}
+                    imageEager={index < 4}
                   />
                 );
               })}

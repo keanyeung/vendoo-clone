@@ -1,4 +1,9 @@
-import { AnalysisSchema, type Analysis } from "./analysis-schema";
+import {
+  AnalysisSchema,
+  CONDITION_VALUES,
+  CONFIDENCE_VALUES,
+  type Analysis,
+} from "./analysis-schema";
 import type { ItemDto } from "./item-dto";
 import type {
   CreateItemInput,
@@ -15,16 +20,16 @@ export type ItemDraft = {
   size: string;
   color: string;
   condition: Analysis["condition"];
-  aiCondition: Analysis["condition"];
+  aiCondition: Analysis["condition"] | null;
   conditionNotes: string;
-  suggestedPrice: number;
-  priceLow: number;
-  priceHigh: number;
-  priceReasoning: string;
+  suggestedPrice: number | null;
+  priceLow: number | null;
+  priceHigh: number | null;
+  priceReasoning: string | null;
   listPrice: string;
   purchasePrice: string;
   keywords: string;
-  aiConfidence: Analysis["confidence"];
+  aiConfidence: Analysis["confidence"] | null;
   purchaseDate: string;
   notes: string;
 };
@@ -56,8 +61,8 @@ export type PersistedDraftItem = {
   draftStep: string | null;
 };
 
-function nullable(value: string): string | null {
-  return value.trim() === "" ? null : value;
+function nullable(value: string | null): string | null {
+  return value === null || value.trim() === "" ? null : value;
 }
 
 function parseKeywords(value: string): string[] {
@@ -164,6 +169,70 @@ export function buildDraftItemInput(
   };
 }
 
+export function createEmptyItemDraft(photoUrls: string[]): ItemDraft {
+  return {
+    photos: photoUrls,
+    title: "",
+    summary: "",
+    description: "",
+    brand: "",
+    category: "",
+    size: "",
+    color: "",
+    condition: "good",
+    aiCondition: null,
+    conditionNotes: "",
+    suggestedPrice: null,
+    priceLow: null,
+    priceHigh: null,
+    priceReasoning: null,
+    listPrice: "",
+    purchasePrice: "",
+    keywords: "",
+    aiConfidence: null,
+    purchaseDate: "",
+    notes: "",
+  };
+}
+
+function fillEmpty(current: string, suggested: string | null): string {
+  return current.trim() === "" ? suggested ?? "" : current;
+}
+
+/** Merge AI output into a manual draft without replacing user-entered values. */
+export function mergeAnalysisIntoEmptyFields(
+  draft: ItemDraft,
+  analysis: Analysis,
+  photoUrls: string[],
+): ItemDraft {
+  return {
+    ...draft,
+    photos: photoUrls,
+    title: fillEmpty(draft.title, analysis.title),
+    summary: fillEmpty(draft.summary, analysis.summary),
+    description: fillEmpty(draft.description, analysis.description),
+    brand: fillEmpty(draft.brand, analysis.brand),
+    category: fillEmpty(draft.category, analysis.category),
+    size: fillEmpty(draft.size, analysis.size),
+    color: fillEmpty(draft.color, analysis.color),
+    // A manual draft always has an explicit condition selection, so analysis
+    // records its reading separately and never changes the user's selection.
+    aiCondition: draft.aiCondition ?? analysis.condition,
+    conditionNotes: fillEmpty(
+      draft.conditionNotes,
+      analysis.condition_notes,
+    ),
+    suggestedPrice: draft.suggestedPrice ?? analysis.suggested_price,
+    priceLow: draft.priceLow ?? analysis.price_low,
+    priceHigh: draft.priceHigh ?? analysis.price_high,
+    priceReasoning:
+      nullable(draft.priceReasoning) ?? analysis.price_reasoning,
+    listPrice: fillEmpty(draft.listPrice, String(analysis.suggested_price)),
+    keywords: fillEmpty(draft.keywords, analysis.keywords.join(", ")),
+    aiConfidence: draft.aiConfidence ?? analysis.confidence,
+  };
+}
+
 export function buildDraftMutationData(
   draft: ItemDraft,
   draftStep: DraftStep,
@@ -194,11 +263,15 @@ export function restorePersistedDraft(item: PersistedDraftItem): {
     keywords: item.keywords,
     confidence: item.aiConfidence,
   });
-  if (!parsedAnalysis.success) return { analysis: null, draft: null };
-
-  const analysis = parsedAnalysis.data;
+  const analysis = parsedAnalysis.success ? parsedAnalysis.data : null;
+  const condition = CONDITION_VALUES.find(
+    (value): boolean => value === item.condition,
+  ) ?? "good";
+  const aiConfidence = CONFIDENCE_VALUES.find(
+    (value): boolean => value === item.aiConfidence,
+  ) ?? null;
   const draft = {
-    ...createItemDraft(analysis, item.photos),
+    ...createEmptyItemDraft(item.photos),
     title: item.title,
     summary: item.summary ?? "",
     description: item.description,
@@ -206,19 +279,26 @@ export function restorePersistedDraft(item: PersistedDraftItem): {
     category: item.category ?? "",
     size: item.size ?? "",
     color: item.color ?? "",
-    condition: analysis.condition,
+    condition,
+    aiCondition: analysis?.condition ?? null,
     conditionNotes: item.conditionNotes ?? "",
+    suggestedPrice: item.suggestedPrice,
+    priceLow: item.priceLow,
+    priceHigh: item.priceHigh,
+    priceReasoning: item.priceReasoning,
     listPrice: String(item.listPrice),
     // The draft API stores a missing purchase price as the database's zero
     // sentinel, and the promotion endpoint treats that sentinel as missing.
     purchasePrice: item.purchasePrice === 0 ? "" : String(item.purchasePrice),
     keywords: item.keywords.join(", "),
+    aiConfidence,
     purchaseDate: item.purchaseDate?.slice(0, 10) ?? "",
     notes: item.notes ?? "",
   };
   return {
     analysis:
-      item.draftStep === "analyzed" || item.draftStep === "reviewed"
+      analysis !== null &&
+      (item.draftStep === "analyzed" || item.draftStep === "reviewed")
         ? analysis
         : null,
     draft,
@@ -264,5 +344,7 @@ export function buildDraftItemDto(
     soldPlatform: null,
     soldDate: null,
     platformFees: null,
+    shippingCost: null,
+    postings: [],
   };
 }

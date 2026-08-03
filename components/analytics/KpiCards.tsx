@@ -105,7 +105,7 @@ export default function KpiCards({
 
       <MetricCard
         label="Revenue"
-        sub={`− ${formatMoney(summary.cost)} cost · − ${formatMoney(summary.fees)} fees`}
+        sub={`− ${formatMoney(summary.cost)} cost · − ${formatMoney(summary.fees)} fees · − ${formatMoney(summary.shipping)} shipping`}
         value={formatMoney(summary.revenue)}
       />
 

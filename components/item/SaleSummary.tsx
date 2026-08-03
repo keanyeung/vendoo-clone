@@ -38,6 +38,7 @@ export function SaleSummary({ item }: SaleSummaryProps) {
     item.soldPlatform !== null &&
     chargesFees(item.soldPlatform) &&
     (item.platformFees === null || item.platformFees === 0);
+  const showShippingWarning = item.shippingCost === null;
 
   return (
     <section className="rounded-xl border border-green-600/25 bg-green-600/[.05] p-6 dark:border-green-400/25 dark:bg-green-400/[.05]">
@@ -81,12 +82,20 @@ export function SaleSummary({ item }: SaleSummaryProps) {
           {formatPrice(item.soldPrice)} sold − {formatPrice(item.purchasePrice)} paid
           {" − "}
           {formatPrice(item.platformFees ?? 0)} fees
+          {" − "}
+          {formatPrice(item.shippingCost ?? 0)} shipping
         </p>
       )}
 
       {showFeeWarning && (
         <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
           No fees recorded — profit may be overstated
+        </p>
+      )}
+
+      {showShippingWarning && (
+        <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+          No shipping cost recorded — profit assumes $0 shipping
         </p>
       )}
 

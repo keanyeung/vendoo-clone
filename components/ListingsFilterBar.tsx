@@ -18,6 +18,11 @@ import {
   serializeSort,
   SORT_OPTIONS,
 } from "@/lib/listing-sort";
+import { PLATFORM_LABELS } from "@/lib/platform-label";
+import {
+  POSTING_PLATFORMS,
+  type PostingPlatform,
+} from "@/lib/postings";
 
 type StatusValue = "" | "DRAFT" | "LISTED" | "SOLD";
 
@@ -32,6 +37,7 @@ export type ListingsFilterBarProps = {
   status: string;
   q: string;
   attention: AttentionFilterKey | "";
+  notOn: PostingPlatform | "";
   sort: string;
   view: "grid" | "table";
   statusCounts: Record<Exclude<StatusValue, "">, number>;
@@ -41,6 +47,7 @@ export default function ListingsFilterBar({
   status,
   q,
   attention,
+  notOn,
   sort,
   view,
   statusCounts,
@@ -80,6 +87,7 @@ export default function ListingsFilterBar({
     nextQ: string,
     nextSort: string | null,
     nextAttention: AttentionFilterKey | "",
+    nextNotOn: PostingPlatform | "",
   ): void {
     const params = new URLSearchParams();
     const trimmedQ = nextQ.trim();
@@ -88,6 +96,7 @@ export default function ListingsFilterBar({
     if (nextStatus) params.set("status", nextStatus);
     if (trimmedQ) params.set("q", trimmedQ);
     if (nextAttention) params.set("attention", nextAttention);
+    if (nextNotOn) params.set("notOn", nextNotOn);
     if (nextNormalizedSort !== defaultSort) {
       params.set("sort", nextNormalizedSort);
     }
@@ -103,7 +112,7 @@ export default function ListingsFilterBar({
 
   function handleStatusChange(nextStatus: StatusValue): void {
     clearTimeout(searchTimeoutRef.current);
-    navigate(nextStatus, searchText, rawSort, attention);
+    navigate(nextStatus, searchText, rawSort, attention, notOn);
   }
 
   function handleSearchChange(event: ChangeEvent<HTMLInputElement>): void {
@@ -111,13 +120,13 @@ export default function ListingsFilterBar({
     setSearchText(nextSearchText);
     clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout((): void => {
-      navigate(status, nextSearchText, rawSort, attention);
+      navigate(status, nextSearchText, rawSort, attention, notOn);
     }, 300);
   }
 
   function handleSortChange(event: ChangeEvent<HTMLSelectElement>): void {
     clearTimeout(searchTimeoutRef.current);
-    navigate(status, searchText, event.target.value, attention);
+    navigate(status, searchText, event.target.value, attention, notOn);
   }
 
   function handleAttentionChange(nextAttention: AttentionFilterKey): void {
@@ -127,13 +136,25 @@ export default function ListingsFilterBar({
       searchText,
       rawSort,
       attention === nextAttention ? "" : nextAttention,
+      notOn,
+    );
+  }
+
+  function handleNotOnChange(event: ChangeEvent<HTMLSelectElement>): void {
+    clearTimeout(searchTimeoutRef.current);
+    navigate(
+      status,
+      searchText,
+      rawSort,
+      attention,
+      event.target.value as PostingPlatform | "",
     );
   }
 
   function clearSearch(): void {
     clearTimeout(searchTimeoutRef.current);
     setSearchText("");
-    navigate(status, "", rawSort, attention);
+    navigate(status, "", rawSort, attention, notOn);
   }
 
   function clearFilters(): void {
@@ -149,6 +170,7 @@ export default function ListingsFilterBar({
     status !== "" ||
     q.trim() !== "" ||
     attention !== "" ||
+    notOn !== "" ||
     sort !== defaultSort;
   const controlClassName =
     "min-h-11 rounded-md border border-black/15 bg-white px-3 py-2 text-base text-black outline-none focus:border-black/40 dark:border-white/20 dark:bg-black dark:text-white dark:focus:border-white/50";
@@ -168,8 +190,8 @@ export default function ListingsFilterBar({
     >
       <fieldset className="min-w-0">
         <legend className="mb-1 text-sm font-medium">Status</legend>
-        <div className="-mx-2 overflow-x-auto px-2 py-1 sm:mx-0 sm:overflow-visible sm:px-0">
-          <div className="flex w-max gap-2 sm:w-auto sm:flex-wrap">
+        <div className="py-1">
+          <div className="flex flex-wrap gap-2">
             {STATUS_OPTIONS.map((option) => {
               const count =
                 option.value === "" ? allCount : statusCounts[option.value];
@@ -196,8 +218,8 @@ export default function ListingsFilterBar({
 
       <fieldset className="min-w-0">
         <legend className="mb-1 text-sm font-medium">Attention</legend>
-        <div className="-mx-2 overflow-x-auto px-2 py-1 sm:mx-0 sm:overflow-visible sm:px-0">
-          <div className="flex w-max gap-2 sm:w-auto sm:flex-wrap">
+        <div className="py-1">
+          <div className="flex flex-wrap gap-2">
             {ATTENTION_FILTERS.map((filter) => {
               const isActive = attention === filter.key;
 
@@ -254,6 +276,22 @@ export default function ListingsFilterBar({
             )}
           </span>
         </div>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          Not on
+          <select
+            value={notOn}
+            onChange={handleNotOnChange}
+            className={controlClassName}
+          >
+            <option value="">Any marketplace</option>
+            {POSTING_PLATFORMS.map((platform) => (
+              <option key={platform} value={platform}>
+                {PLATFORM_LABELS[platform]}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <label className="flex flex-col gap-1 text-sm font-medium">
           Sort

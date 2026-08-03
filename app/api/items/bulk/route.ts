@@ -63,6 +63,7 @@ export async function POST(request: Request): Promise<Response> {
                   soldPlatform: null,
                   soldDate: null,
                   platformFees: null,
+                  shippingCost: null,
                 },
               }),
           unsoldIds.length === 0

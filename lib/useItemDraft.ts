@@ -42,6 +42,7 @@ export type ItemDraftController = {
     field: Key,
     value: ItemDraftFields[Key],
   ) => void;
+  replaceFields: (fields: ItemDraftFields) => void;
   addPhotos: (photos: DraftPhoto[]) => void;
   markPhotoUploadStarted: (photoId: string) => void;
   markPhotoUploadSucceeded: (photoId: string, url: string) => void;
@@ -141,6 +142,8 @@ export function useItemDraft(item: ItemDto): ItemDraftController {
     changeSummary: getDraftChangeSummary(state),
     savablePhotoUrls: getSavablePhotoUrls(state),
     setField,
+    replaceFields: (fields: ItemDraftFields): void =>
+      dispatch({ type: "fields_replaced", fields }),
     addPhotos,
     markPhotoUploadStarted: (photoId: string): void =>
       dispatch({ type: "photo_upload_started", photoId }),

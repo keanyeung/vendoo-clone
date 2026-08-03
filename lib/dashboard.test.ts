@@ -38,6 +38,8 @@ function makeItem(overrides: Partial<ItemDto> = {}): ItemDto {
     soldPlatform: "EBAY",
     soldDate: "2026-07-15T00:00:00.000Z",
     platformFees: 10,
+    shippingCost: null,
+    postings: [],
     ...overrides,
   };
 }
@@ -275,6 +277,14 @@ describe("computeDashboard", () => {
           detail: "Profit is overstated",
           action: "Fix",
           href: "/listings?attention=missing-fees",
+          count: 1,
+        },
+        {
+          kind: "listed_unposted",
+          title: "1 listed item not posted",
+          detail: "Ready to crosspost",
+          action: "Post",
+          href: "/listings?attention=listed-unposted",
           count: 1,
         },
       ],

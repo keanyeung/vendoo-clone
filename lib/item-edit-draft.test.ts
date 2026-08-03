@@ -50,6 +50,8 @@ function itemFixture(): ItemDto {
     soldPlatform: null,
     soldDate: null,
     platformFees: null,
+    shippingCost: null,
+    postings: [],
   };
 }
 

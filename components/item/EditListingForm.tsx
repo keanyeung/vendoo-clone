@@ -11,8 +11,20 @@ import {
 } from "react";
 
 import { CopyListingSection } from "@/components/CopyListingSection";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
+import AnalysisDiffPanel from "@/components/item/AnalysisDiffPanel";
 import { PhotoManager } from "@/components/item/PhotoManager";
-import { CONDITION_VALUES } from "@/lib/analysis-schema";
+import {
+  AnalysisSchema,
+  CONDITION_VALUES,
+  type Analysis,
+} from "@/lib/analysis-schema";
+import {
+  analysisReferenceFields,
+  applyAnalysisSelection,
+  buildAnalysisDiff,
+  type AnalysisEditableField,
+} from "@/lib/analysis-diff";
 import {
   buildEditDraftItemDto,
   buildItemUpdateInput,
@@ -21,9 +33,14 @@ import type { ItemDraftFields } from "@/lib/item-edit-draft";
 import type { ItemDto } from "@/lib/item-dto";
 import { UpdateItemSchema } from "@/lib/item-schema";
 import { carryListingContext } from "@/lib/listing-context";
+import { formatUsageLine, type ModelUsage } from "@/lib/model-pricing";
 import { useItemDraft } from "@/lib/useItemDraft";
 
 type FieldErrors = Record<string, string>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
 
 const controlClass =
   "min-h-11 w-full rounded-md border border-black/15 bg-transparent px-3 py-2 text-base outline-none focus:border-black/40 focus:ring-1 focus:ring-black/20 dark:border-white/20 dark:focus:border-white/50 dark:focus:ring-white/20 sm:min-h-0 sm:text-sm";
@@ -86,6 +103,18 @@ export function EditListingForm({ item }: { item: ItemDto }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isDiscarding, setIsDiscarding] = useState<boolean>(false);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [analysisProposal, setAnalysisProposal] = useState<Analysis | null>(null);
+  const [selectedAnalysisFields, setSelectedAnalysisFields] = useState<
+    AnalysisEditableField[]
+  >([]);
+  const [pendingAnalysis, setPendingAnalysis] = useState<Analysis | null>(null);
+  const [analysisUsage, setAnalysisUsage] = useState<ModelUsage | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisNotice, setAnalysisNotice] = useState<string | null>(null);
+  const [pendingNavigationHref, setPendingNavigationHref] = useState<
+    string | null
+  >(null);
   const listPrice = numberValue(draft.fields.listPrice);
   const purchasePrice = numberValue(draft.fields.purchasePrice);
   const margin = listPrice - purchasePrice;
@@ -98,11 +127,18 @@ export function EditListingForm({ item }: { item: ItemDto }) {
   );
   const hasIncompletePhotos =
     draft.photos.length > 0 && draft.savablePhotoUrls === null;
+  const hasUnsavedChanges = draft.dirty || pendingAnalysis !== null;
   const canSave =
-    draft.dirty &&
+    hasUnsavedChanges &&
     draft.savablePhotoUrls !== null &&
     !isSaving &&
     !isDiscarding;
+  const analysisChanges =
+    analysisProposal === null
+      ? []
+      : buildAnalysisDiff(draft.fields, analysisProposal);
+  const usageLine =
+    analysisUsage === null ? null : formatUsageLine(analysisUsage);
   const from = searchParams.get("from");
   const itemHref = from
     ? carryListingContext(`/listings/${item.id}`, { from })
@@ -110,7 +146,7 @@ export function EditListingForm({ item }: { item: ItemDto }) {
   const savedItemHref = `${itemHref}${itemHref.includes("?") ? "&" : "?"}saved=1`;
 
   useEffect(() => {
-    if (!draft.dirty) return;
+    if (!hasUnsavedChanges) return;
 
     function handleBeforeUnload(event: BeforeUnloadEvent): void {
       event.preventDefault();
@@ -142,10 +178,12 @@ export function EditListingForm({ item }: { item: ItemDto }) {
         return;
       }
 
-      if (!window.confirm("You have unsaved changes. Leave without saving?")) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setSubmitError(null);
+      setPendingNavigationHref(
+        `${anchor.pathname}${anchor.search}${anchor.hash}`,
+      );
     }
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -154,7 +192,7 @@ export function EditListingForm({ item }: { item: ItemDto }) {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       document.removeEventListener("click", handleDocumentClick, true);
     };
-  }, [draft.dirty]);
+  }, [hasUnsavedChanges]);
 
   function clearFieldError(field: keyof ItemDraftFields): void {
     setFieldErrors((current: FieldErrors): FieldErrors => {
@@ -201,12 +239,15 @@ export function EditListingForm({ item }: { item: ItemDto }) {
     addKeyword();
   }
 
-  async function handleDiscard(): Promise<void> {
-    if (!draft.dirty || isSaving || isDiscarding) return;
+  async function discardChanges(): Promise<void> {
     setIsDiscarding(true);
     setSubmitError(null);
     setFieldErrors({});
     setKeywordDraft("");
+    setPendingAnalysis(null);
+    setAnalysisProposal(null);
+    setSelectedAnalysisFields([]);
+    setAnalysisNotice(null);
 
     const cleanup = await draft.discard();
     if (cleanup.failedUrls.length > 0) {
@@ -217,9 +258,30 @@ export function EditListingForm({ item }: { item: ItemDto }) {
     setIsDiscarding(false);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    if (!draft.dirty || isSaving || isDiscarding) return;
+  async function handleDiscard(): Promise<void> {
+    if (!hasUnsavedChanges || isSaving || isDiscarding) return;
+    await discardChanges();
+  }
+
+  async function discardAndNavigate(): Promise<void> {
+    if (
+      pendingNavigationHref === null ||
+      !hasUnsavedChanges ||
+      isSaving ||
+      isDiscarding
+    ) {
+      return;
+    }
+
+    const destination = pendingNavigationHref;
+    await discardChanges();
+    setPendingNavigationHref(null);
+    router.push(destination);
+    router.refresh();
+  }
+
+  async function saveChanges(destination: string): Promise<void> {
+    if (!hasUnsavedChanges || isSaving || isDiscarding) return;
 
     if (draft.photos.length === 0) {
       setSubmitError("Add at least one photo before saving.");
@@ -255,7 +317,17 @@ export function EditListingForm({ item }: { item: ItemDto }) {
       const response = await fetch(`/api/items/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "update", data: parsed.data }),
+        body: JSON.stringify(
+          pendingAnalysis === null
+            ? { action: "update", data: parsed.data }
+            : {
+                action: "apply_analysis",
+                data: {
+                  ...parsed.data,
+                  ...analysisReferenceFields(pendingAnalysis),
+                },
+              },
+        ),
       });
 
       if (!response.ok) {
@@ -269,7 +341,9 @@ export function EditListingForm({ item }: { item: ItemDto }) {
       }
 
       await draft.finalizeSave();
-      router.push(savedItemHref);
+      setPendingAnalysis(null);
+      setPendingNavigationHref(null);
+      router.push(destination);
       router.refresh();
     } catch {
       setSubmitError(
@@ -278,6 +352,128 @@ export function EditListingForm({ item }: { item: ItemDto }) {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    await saveChanges(savedItemHref);
+  }
+
+  async function handleAnalyze(): Promise<void> {
+    const photoUrls = draft.savablePhotoUrls;
+    if (
+      photoUrls === null ||
+      isAnalyzing ||
+      isSaving ||
+      isDiscarding
+    ) {
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    setAnalysisNotice(null);
+    setAnalysisProposal(null);
+    setAnalysisUsage(null);
+    setSelectedAnalysisFields([]);
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoUrls }),
+      });
+      let body: unknown = null;
+      try {
+        body = await response.json();
+      } catch {
+        // The status fallback below handles a non-JSON response.
+      }
+
+      if (!response.ok) {
+        setAnalysisError(
+          isRecord(body) && typeof body.error === "string"
+            ? body.error
+            : `Analysis failed with status ${response.status}.`,
+        );
+        return;
+      }
+      if (!isRecord(body)) {
+        setAnalysisError("The analysis response was incomplete. Please try again.");
+        return;
+      }
+
+      const parsedAnalysis = AnalysisSchema.safeParse(body.analysis);
+      const usage = body.usage;
+      if (
+        !parsedAnalysis.success ||
+        !isRecord(usage) ||
+        typeof usage.inputTokens !== "number" ||
+        typeof usage.outputTokens !== "number" ||
+        typeof usage.model !== "string"
+      ) {
+        setAnalysisError("The analysis response was incomplete. Please try again.");
+        return;
+      }
+
+      setAnalysisUsage({
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        model: usage.model,
+      });
+      setAnalysisProposal(parsedAnalysis.data);
+      if (buildAnalysisDiff(draft.fields, parsedAnalysis.data).length === 0) {
+        setAnalysisNotice(
+          "Analysis finished, but it did not propose changes to editable fields.",
+        );
+      }
+    } catch {
+      setAnalysisError(
+        "Could not reach the analysis service. Check your connection and try again.",
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }
+
+  function toggleAnalysisField(field: AnalysisEditableField): void {
+    setSelectedAnalysisFields((current) =>
+      current.includes(field)
+        ? current.filter((candidate) => candidate !== field)
+        : [...current, field],
+    );
+  }
+
+  function applySelectedAnalysis(): void {
+    if (analysisProposal === null || selectedAnalysisFields.length === 0) {
+      return;
+    }
+
+    draft.replaceFields(
+      applyAnalysisSelection(
+        draft.fields,
+        analysisProposal,
+        selectedAnalysisFields,
+      ),
+    );
+    setFieldErrors((current) => {
+      const next = { ...current };
+      for (const field of selectedAnalysisFields) delete next[field];
+      return next;
+    });
+    setPendingAnalysis(analysisProposal);
+    setAnalysisProposal(null);
+    setAnalysisNotice(
+      `${selectedAnalysisFields.length} AI ${selectedAnalysisFields.length === 1 ? "suggestion" : "suggestions"} applied to the unsaved draft.`,
+    );
+    setSelectedAnalysisFields([]);
+    setSubmitError(null);
+  }
+
+  function dismissAnalysisProposal(): void {
+    setAnalysisProposal(null);
+    setSelectedAnalysisFields([]);
+    setAnalysisNotice(null);
   }
 
   const marginNote =
@@ -292,6 +488,8 @@ export function EditListingForm({ item }: { item: ItemDto }) {
       : margin <= 0
         ? "text-amber-700 dark:text-amber-400"
         : "text-black/55 dark:text-white/55";
+  const displayedPriceLow = pendingAnalysis?.price_low ?? item.priceLow;
+  const displayedPriceHigh = pendingAnalysis?.price_high ?? item.priceHigh;
 
   return (
     <>
@@ -301,14 +499,10 @@ export function EditListingForm({ item }: { item: ItemDto }) {
             href={itemHref}
             data-draft-guarded="true"
             onNavigate={(event): void => {
-              if (
-                draft.dirty &&
-                !window.confirm(
-                  "You have unsaved changes. Leave without saving?",
-                )
-              ) {
-                event.preventDefault();
-              }
+              if (!hasUnsavedChanges) return;
+              event.preventDefault();
+              setSubmitError(null);
+              setPendingNavigationHref(itemHref);
             }}
             className="inline-flex min-h-11 shrink-0 items-center text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
           >
@@ -325,18 +519,44 @@ export function EditListingForm({ item }: { item: ItemDto }) {
           <span
             aria-live="polite"
             className={`hidden shrink-0 text-xs sm:inline ${
-              draft.dirty
+              hasUnsavedChanges
                 ? "text-amber-700 dark:text-amber-400"
                 : "text-black/45 dark:text-white/45"
             }`}
           >
-            {draft.dirty ? "Unsaved changes" : "All changes saved"}
+            {hasUnsavedChanges ? "Unsaved changes" : "All changes saved"}
+          </span>
+          <p className="hidden max-w-52 text-right text-xs text-black/50 dark:text-white/50 xl:block">
+            {usageLine ?? "Paid AI analysis · exact cost shown after"}
+          </p>
+          <span id="edit-analysis-cost" className="sr-only">
+            {usageLine ?? "This is a paid AI analysis. Exact cost is shown after completion."}
           </span>
           <button
             type="button"
-            disabled={!draft.dirty || isSaving || isDiscarding}
+            disabled={
+              draft.savablePhotoUrls === null ||
+              isAnalyzing ||
+              isSaving ||
+              isDiscarding
+            }
+            onClick={() => void handleAnalyze()}
+            aria-describedby="edit-analysis-cost"
+            aria-label="Re-analyze photos"
+            className="min-h-11 rounded-md border border-black/15 px-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/20 sm:px-3"
+          >
+            <span className="sm:hidden">
+              {isAnalyzing ? "AI…" : "AI"}
+            </span>
+            <span className="hidden sm:inline">
+              {isAnalyzing ? "Analyzing…" : "Re-analyze photos"}
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={!hasUnsavedChanges || isSaving || isDiscarding}
             onClick={(): void => void handleDiscard()}
-            className="min-h-11 rounded-md border border-black/15 px-3 text-sm font-medium disabled:opacity-40 dark:border-white/20"
+            className="hidden min-h-11 rounded-md border border-black/15 px-3 text-sm font-medium disabled:opacity-40 dark:border-white/20 sm:block"
           >
             Discard
           </button>
@@ -346,7 +566,10 @@ export function EditListingForm({ item }: { item: ItemDto }) {
             disabled={!canSave}
             className="min-h-11 rounded-md bg-foreground px-3 text-sm font-semibold text-background disabled:cursor-not-allowed disabled:opacity-35 sm:px-4"
           >
-            {isSaving ? "Saving…" : "Save changes"}
+            <span className="sm:hidden">{isSaving ? "Saving…" : "Save"}</span>
+            <span className="hidden sm:inline">
+              {isSaving ? "Saving…" : "Save changes"}
+            </span>
           </button>
         </div>
       </header>
@@ -355,9 +578,53 @@ export function EditListingForm({ item }: { item: ItemDto }) {
         id="edit-listing-form"
         onSubmit={(event): void => void handleSubmit(event)}
         className={`mx-auto w-full max-w-[1180px] flex-1 px-4 py-6 sm:px-6 ${
-          draft.dirty ? "pb-28" : "pb-10"
+          hasUnsavedChanges ? "pb-28" : "pb-10"
         }`}
       >
+        <div aria-live="polite" className="mb-4 space-y-3">
+          {isAnalyzing && (
+            <p className="rounded-lg border border-black/10 bg-black/[.03] px-4 py-3 text-sm dark:border-white/15 dark:bg-white/[.04]">
+              Analyzing the current photos… This can take a moment.
+            </p>
+          )}
+          {analysisError !== null && (
+            <div
+              role="alert"
+              className="flex items-center justify-between gap-3 rounded-lg border border-red-600/25 bg-red-600/[.05] px-4 py-3 text-sm text-red-700 dark:border-red-400/25 dark:text-red-400"
+            >
+              <p>{analysisError}</p>
+              <button
+                type="button"
+                onClick={() => setAnalysisError(null)}
+                className="min-h-11 shrink-0 font-medium"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+          {analysisNotice !== null && (
+            <p className="rounded-lg border border-green-600/20 bg-green-600/[.05] px-4 py-3 text-sm text-green-800 dark:border-green-400/20 dark:text-green-300">
+              {analysisNotice}
+            </p>
+          )}
+          <p className="text-xs text-black/50 dark:text-white/50 xl:hidden">
+            {usageLine ?? "Paid AI analysis · exact cost shown after completion"}
+          </p>
+        </div>
+
+        {analysisProposal !== null && usageLine !== null && (
+          <div className="mb-4">
+            <AnalysisDiffPanel
+              changes={analysisChanges}
+              selectedFields={selectedAnalysisFields}
+              usageLine={usageLine}
+              onToggle={toggleAnalysisField}
+              onApply={applySelectedAnalysis}
+              onDismiss={dismissAnalysisProposal}
+            />
+          </div>
+        )}
+
         <div className="flex flex-wrap items-start gap-6">
           <div className="min-w-0 max-w-[520px] flex-[1_1_440px] min-[1030px]:sticky min-[1030px]:top-[132px]">
             <PhotoManager
@@ -446,10 +713,11 @@ export function EditListingForm({ item }: { item: ItemDto }) {
                         className="min-h-11 min-w-0 flex-1 bg-transparent px-2 py-2 text-base outline-none sm:min-h-0 sm:text-sm"
                       />
                     </div>
-                    {item.priceLow !== null && item.priceHigh !== null && (
+                    {displayedPriceLow !== null &&
+                      displayedPriceHigh !== null && (
                       <p className="text-xs text-black/50 dark:text-white/50">
-                        AI suggested {formatMoney(item.priceLow)}–
-                        {formatMoney(item.priceHigh)}
+                        AI suggested {formatMoney(displayedPriceLow)}–
+                        {formatMoney(displayedPriceHigh)}
                       </p>
                     )}
                     <ErrorText field="listPrice" errors={fieldErrors} />
@@ -642,11 +910,13 @@ export function EditListingForm({ item }: { item: ItemDto }) {
         </div>
       </form>
 
-      {draft.dirty && (
+      {hasUnsavedChanges && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-background/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm dark:border-white/15">
           <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-3 px-4 sm:px-6">
             <span className="text-sm text-black/60 dark:text-white/60">
-              {draft.changeSummary}
+              {draft.dirty
+                ? draft.changeSummary
+                : "AI reference update — not saved yet."}
             </span>
             <div className="flex gap-2">
               <button
@@ -669,6 +939,21 @@ export function EditListingForm({ item }: { item: ItemDto }) {
           </div>
         </div>
       )}
+
+      <UnsavedChangesDialog
+        open={pendingNavigationHref !== null}
+        canSave={canSave}
+        isSaving={isSaving}
+        isDiscarding={isDiscarding}
+        error={submitError}
+        onSave={(): void => {
+          if (pendingNavigationHref !== null) {
+            void saveChanges(pendingNavigationHref);
+          }
+        }}
+        onDiscard={(): void => void discardAndNavigate()}
+        onCancel={(): void => setPendingNavigationHref(null)}
+      />
     </>
   );
 }

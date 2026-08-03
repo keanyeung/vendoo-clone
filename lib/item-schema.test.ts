@@ -2,13 +2,65 @@ import { describe, expect, it } from "vitest";
 
 import {
   BulkItemMutationSchema,
+  buildDuplicateTitle,
   CreateItemSchema,
   DraftItemSchema,
   ItemMutationSchema,
   MarkSoldSchema,
+  ITEM_TITLE_MAX_LENGTH,
+  RemoveItemPostingSchema,
+  UpsertItemPostingSchema,
 } from "./item-schema";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+describe("buildDuplicateTitle", () => {
+  it("adds the copy suffix without exceeding the title limit", () => {
+    expect(buildDuplicateTitle("Vintage denim jacket")).toBe(
+      "Vintage denim jacket (copy)",
+    );
+
+    const title = buildDuplicateTitle("x".repeat(ITEM_TITLE_MAX_LENGTH));
+    expect(title).toHaveLength(ITEM_TITLE_MAX_LENGTH);
+    expect(title.endsWith(" (copy)")).toBe(true);
+  });
+});
+
+describe("item posting schemas", () => {
+  it("accepts an optional valid URL and allows it to be cleared", () => {
+    expect(
+      UpsertItemPostingSchema.safeParse({
+        platform: "EBAY",
+        url: "https://www.ebay.com/itm/123",
+      }).success,
+    ).toBe(true);
+    expect(
+      UpsertItemPostingSchema.safeParse({
+        platform: "DEPOP",
+        url: null,
+      }).success,
+    ).toBe(true);
+    expect(
+      UpsertItemPostingSchema.safeParse({ platform: "FB_MARKETPLACE" })
+        .success,
+    ).toBe(true);
+  });
+
+  it("rejects unknown platforms and malformed URLs", () => {
+    expect(
+      UpsertItemPostingSchema.safeParse({ platform: "OTHER" }).success,
+    ).toBe(false);
+    expect(
+      UpsertItemPostingSchema.safeParse({
+        platform: "EBAY",
+        url: "not a URL",
+      }).success,
+    ).toBe(false);
+    expect(
+      RemoveItemPostingSchema.safeParse({ platform: "OTHER" }).success,
+    ).toBe(false);
+  });
+});
 
 function salePayload(overrides: Record<string, unknown> = {}) {
   return {
@@ -16,6 +68,7 @@ function salePayload(overrides: Record<string, unknown> = {}) {
     soldPlatform: "EBAY",
     soldDate: new Date().toISOString().slice(0, 10),
     platformFees: 8.5,
+    shippingCost: null,
     ...overrides,
   };
 }
@@ -62,18 +115,24 @@ describe("DraftItemSchema", () => {
     expect(DraftItemSchema.safeParse(draft).success).toBe(true);
   });
 
-  it.each([
-    ["photos", []],
-    ["title", ""],
-    ["description", ""],
-  ])("still rejects an invalid %s", (field, value) => {
+  it("still rejects an empty photo list", () => {
     const parsed = DraftItemSchema.safeParse(
-      itemPayload({ [field]: value, status: "DRAFT" }),
+      itemPayload({ photos: [], status: "DRAFT" }),
     );
 
     expect(parsed.success).toBe(false);
-    if (parsed.success) throw new Error(`Expected ${field} to fail`);
-    expect(parsed.error.issues.map((issue) => issue.path[0])).toContain(field);
+    if (parsed.success) throw new Error("Expected photos to fail");
+    expect(parsed.error.issues.map((issue) => issue.path[0])).toContain(
+      "photos",
+    );
+  });
+
+  it("accepts blank listing copy while a manual draft is incomplete", () => {
+    expect(
+      DraftItemSchema.safeParse(
+        itemPayload({ title: "", description: "", status: "DRAFT" }),
+      ).success,
+    ).toBe(true);
   });
 
   it("keeps the ordered price-range check", () => {
@@ -182,9 +241,82 @@ describe("MarkSoldSchema", () => {
       ]),
     );
   });
+
+  it("accepts a recorded zero shipping cost and rejects a negative one", () => {
+    expect(
+      MarkSoldSchema.safeParse(salePayload({ shippingCost: 0 })).success,
+    ).toBe(true);
+
+    const parsed = MarkSoldSchema.safeParse(
+      salePayload({ shippingCost: -1 }),
+    );
+    expect(parsed.success).toBe(false);
+    if (parsed.success) throw new Error("Expected shipping cost to fail");
+    expect(parsed.error.issues.map((issue) => issue.message)).toContain(
+      "Shipping cost cannot be negative.",
+    );
+  });
 });
 
 describe("ItemMutationSchema", () => {
+  it("keeps AI reference ownership in apply_analysis", () => {
+    const data = {
+      ...itemPayload(),
+      suggestedPrice: 60,
+      priceLow: 50,
+      priceHigh: 70,
+      priceReasoning: "Based on current secondhand demand.",
+      aiConfidence: "high",
+    };
+
+    expect(
+      ItemMutationSchema.safeParse({ action: "apply_analysis", data }).success,
+    ).toBe(true);
+    expect(
+      ItemMutationSchema.safeParse({
+        action: "apply_analysis",
+        data: { ...data, priceLow: 80, priceHigh: 70 },
+      }).success,
+    ).toBe(false);
+    const ordinaryUpdate = ItemMutationSchema.safeParse({
+      action: "update",
+      data,
+    });
+    expect(ordinaryUpdate.success).toBe(true);
+    if (!ordinaryUpdate.success || ordinaryUpdate.data.action !== "update") {
+      throw new Error("Expected ordinary update to parse");
+    }
+    expect("suggestedPrice" in ordinaryUpdate.data.data).toBe(false);
+  });
+
+  it("accepts only validated title and list-price quick edits", () => {
+    expect(
+      ItemMutationSchema.safeParse({
+        action: "patch_fields",
+        data: { title: "Updated title" },
+      }).success,
+    ).toBe(true);
+    expect(
+      ItemMutationSchema.safeParse({
+        action: "patch_fields",
+        data: { listPrice: 42.5 },
+      }).success,
+    ).toBe(true);
+
+    for (const data of [
+      {},
+      { title: "" },
+      { listPrice: 0 },
+      { listPrice: 12.345 },
+      { notes: "Not quick editable" },
+    ]) {
+      expect(
+        ItemMutationSchema.safeParse({ action: "patch_fields", data })
+          .success,
+      ).toBe(false);
+    }
+  });
+
   it("parses update_draft without allowing a status change", () => {
     const data = itemPayload({ status: "DRAFT", draftStep: "reviewed" });
     delete data.status;

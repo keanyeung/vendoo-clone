@@ -7,7 +7,7 @@ export default function Loading() {
   return (
     <main
       aria-busy="true"
-      className="mx-auto w-full max-w-5xl flex-1 p-6"
+      className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 xl:px-8"
     >
       <p role="status" aria-live="polite" className="sr-only">
         Loading listings…

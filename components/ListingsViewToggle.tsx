@@ -1,12 +1,14 @@
 import Link from "next/link";
 import type { AttentionFilterKey } from "@/lib/listing-filters";
 import { parseSort, serializeSort } from "@/lib/listing-sort";
+import type { PostingPlatform } from "@/lib/postings";
 
 type ListingsViewToggleProps = {
   view: "grid" | "table";
   status: string;
   q: string;
   attention: AttentionFilterKey | "";
+  notOn: PostingPlatform | "";
   sort: string;
 };
 
@@ -15,12 +17,14 @@ export default function ListingsViewToggle({
   status,
   q,
   attention,
+  notOn,
   sort,
 }: ListingsViewToggleProps) {
   const baseParams = new URLSearchParams();
   if (status) baseParams.set("status", status);
   if (q) baseParams.set("q", q);
   if (attention) baseParams.set("attention", attention);
+  if (notOn) baseParams.set("notOn", notOn);
   baseParams.set("sort", serializeSort(parseSort(sort)));
 
   const cardsQuery = baseParams.toString();

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ItemDto } from "./item-dto";
 import {
   bucketProfit,
+  computeProfit,
   filterSales,
   platformSplit,
   previousBounds,
@@ -42,6 +43,8 @@ function makeItem(overrides: Partial<ItemDto> = {}): ItemDto {
     soldPlatform: "EBAY",
     soldDate: "2026-07-15T00:00:00.000Z",
     platformFees: 10,
+    shippingCost: null,
+    postings: [],
     ...overrides,
   };
 }
@@ -129,6 +132,21 @@ describe("previousBounds", () => {
 });
 
 describe("toSales and summaries", () => {
+  it("subtracts shipping from net profit and preserves null as not recorded", () => {
+    expect(
+      computeProfit({
+        soldPrice: 65,
+        purchasePrice: 6,
+        platformFees: 8.61,
+        shippingCost: 12,
+      }),
+    ).toBeCloseTo(38.39);
+
+    const sale = makeSale({ shippingCost: null });
+    expect(sale.shipping).toBeNull();
+    expect(sale.profit).toBe(50);
+  });
+
   it("normalizes eligible rows, applies zero defaults, and sorts newest first", () => {
     const sales = toSales([
       makeItem({ id: "draft", status: "DRAFT" }),
@@ -150,6 +168,7 @@ describe("toSales and summaries", () => {
     expect(sales[0]).toMatchObject({
       soldPrice: 0,
       fees: 0,
+      shipping: null,
       profit: -40,
       photo: null,
     });
@@ -187,6 +206,7 @@ describe("toSales and summaries", () => {
       revenue: 0,
       cost: 0,
       fees: 0,
+      shipping: 0,
       profit: 0,
       count: 0,
       avgProfit: null,

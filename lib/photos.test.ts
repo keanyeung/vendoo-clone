@@ -4,6 +4,7 @@ import {
   getAppPhotoObjectPath,
   getRemovedPhotoUrls,
   isAppPhotoUrl,
+  isPhotoObjectOlderThanMinimum,
 } from "./photos";
 
 const SUPABASE_URL = "https://project.supabase.co";
@@ -45,5 +46,26 @@ describe("getRemovedPhotoUrls", () => {
         ["three.jpg", "one.jpg"],
       ),
     ).toEqual(["two.jpg"]);
+  });
+});
+
+describe("isPhotoObjectOlderThanMinimum", () => {
+  const now = new Date("2026-08-02T12:00:00.000Z");
+
+  it("only accepts objects strictly older than the 24-hour safety floor", () => {
+    expect(
+      isPhotoObjectOlderThanMinimum("2026-08-01T11:59:59.999Z", now),
+    ).toBe(true);
+    expect(
+      isPhotoObjectOlderThanMinimum("2026-08-01T12:00:00.000Z", now),
+    ).toBe(false);
+    expect(
+      isPhotoObjectOlderThanMinimum("2026-08-02T11:00:00.000Z", now),
+    ).toBe(false);
+  });
+
+  it("fails closed when storage does not provide a usable creation time", () => {
+    expect(isPhotoObjectOlderThanMinimum(null, now)).toBe(false);
+    expect(isPhotoObjectOlderThanMinimum("not-a-date", now)).toBe(false);
   });
 });

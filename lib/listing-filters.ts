@@ -1,17 +1,24 @@
 import type { ItemStatus } from "@prisma/client";
 
 import { daysListed } from "./listing-sort";
+import {
+  livePlatforms,
+  type PostingPlatform,
+  type PostingState,
+} from "./postings";
 
 export type AttentionFilterKey =
   | "aging"
   | "stale-drafts"
-  | "missing-fees";
+  | "missing-fees"
+  | "listed-unposted";
 
 export type ListingFilterItem = {
   status: ItemStatus;
   createdAt: string;
   soldDate: string | null;
   platformFees: number | null;
+  postings: readonly PostingState[];
 };
 
 export function isAgingListing(
@@ -36,6 +43,21 @@ export function isMissingFeesSale(
   return item.status === "SOLD" && item.platformFees === null;
 }
 
+export function isListedButNotPosted(
+  item: ListingFilterItem,
+  nowMs: number,
+): boolean {
+  void nowMs;
+  return item.status === "LISTED" && livePlatforms(item.postings).length === 0;
+}
+
+export function isMissingPostingPlatform(
+  item: Pick<ListingFilterItem, "postings">,
+  platform: PostingPlatform,
+): boolean {
+  return !livePlatforms(item.postings).includes(platform);
+}
+
 export const ATTENTION_FILTERS = [
   {
     key: "aging",
@@ -51,6 +73,11 @@ export const ATTENTION_FILTERS = [
     key: "missing-fees",
     label: "Missing fees",
     matches: isMissingFeesSale,
+  },
+  {
+    key: "listed-unposted",
+    label: "Listed but not posted",
+    matches: isListedButNotPosted,
   },
 ] satisfies ReadonlyArray<{
   key: AttentionFilterKey;

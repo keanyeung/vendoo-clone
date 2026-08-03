@@ -1,6 +1,20 @@
 import type { Item, ItemStatus, Platform } from "@prisma/client";
 
 // Converts Prisma Item rows into plain, JSON-serializable objects safe to render and pass to Client Components.
+export type ItemPostingDto = {
+  id: string;
+  itemId: string;
+  platform: Platform;
+  postedAt: string;
+  url: string | null;
+  removedAt: string | null;
+};
+
+export type ListingPostingDto = Pick<
+  ItemPostingDto,
+  "platform" | "removedAt"
+>;
+
 export type ItemDto = {
   id: string;
   createdAt: string;
@@ -30,6 +44,21 @@ export type ItemDto = {
   soldPlatform: Platform | null;
   soldDate: string | null;
   platformFees: number | null;
+  shippingCost: number | null;
+  postings: ItemPostingDto[];
+};
+
+type ItemPostingRow = {
+  id: string;
+  itemId: string;
+  platform: Platform;
+  postedAt: Date;
+  url: string | null;
+  removedAt: Date | null;
+};
+
+type ItemWithOptionalPostings = Item & {
+  postings?: ItemPostingRow[];
 };
 
 export type ListingRowDto = {
@@ -47,6 +76,13 @@ export type ListingRowDto = {
   soldPlatform: Platform | null;
   soldDate: string | null;
   platformFees: number | null;
+  shippingCost: number | null;
+  postings: ListingPostingDto[];
+};
+
+type ListingPostingRow = {
+  platform: Platform;
+  removedAt: Date | null;
 };
 
 type ListingRow = Pick<
@@ -65,9 +101,23 @@ type ListingRow = Pick<
   | "soldPlatform"
   | "soldDate"
   | "platformFees"
->;
+  | "shippingCost"
+> & {
+  postings: ListingPostingRow[];
+};
 
-export function toItemDto(item: Item): ItemDto {
+export function toItemPostingDto(posting: ItemPostingRow): ItemPostingDto {
+  return {
+    id: posting.id,
+    itemId: posting.itemId,
+    platform: posting.platform,
+    postedAt: posting.postedAt.toISOString(),
+    url: posting.url,
+    removedAt: posting.removedAt?.toISOString() ?? null,
+  };
+}
+
+export function toItemDto(item: ItemWithOptionalPostings): ItemDto {
   return {
     id: item.id,
     createdAt: item.createdAt.toISOString(),
@@ -100,10 +150,13 @@ export function toItemDto(item: Item): ItemDto {
     soldDate: item.soldDate === null ? null : item.soldDate.toISOString(),
     platformFees:
       item.platformFees === null ? null : Number(item.platformFees),
+    shippingCost:
+      item.shippingCost === null ? null : Number(item.shippingCost),
+    postings: (item.postings ?? []).map(toItemPostingDto),
   };
 }
 
-export function toItemDtos(items: Item[]): ItemDto[] {
+export function toItemDtos(items: ItemWithOptionalPostings[]): ItemDto[] {
   return items.map(toItemDto);
 }
 
@@ -124,6 +177,12 @@ export function toListingRowDto(item: ListingRow): ListingRowDto {
     soldDate: item.soldDate === null ? null : item.soldDate.toISOString(),
     platformFees:
       item.platformFees === null ? null : Number(item.platformFees),
+    shippingCost:
+      item.shippingCost === null ? null : Number(item.shippingCost),
+    postings: item.postings.map((posting) => ({
+      platform: posting.platform,
+      removedAt: posting.removedAt?.toISOString() ?? null,
+    })),
   };
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   type KeyboardEvent,
@@ -98,13 +99,15 @@ export function ItemGallery({
         type="button"
         onClick={() => setIsLightboxOpen(true)}
         aria-label={`Open ${title}, photo ${activeIndex + 1} of ${photos.length} in full screen`}
-        className="block aspect-square min-h-11 w-full overflow-hidden rounded-[14px] border border-black/15 bg-black/[.03] focus-visible:outline-2 focus-visible:outline-offset-2 dark:border-white/20 dark:bg-white/[.04]"
+        className="relative block aspect-square min-h-11 w-full overflow-hidden rounded-[14px] border border-black/15 bg-black/[.03] focus-visible:outline-2 focus-visible:outline-offset-2 dark:border-white/20 dark:bg-white/[.04]"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={activePhoto}
           alt={title}
-          className="h-full w-full object-cover"
+          fill
+          sizes="(max-width: 1043px) calc(100vw - 2rem), 440px"
+          loading="eager"
+          className="object-cover"
         />
       </button>
 
@@ -126,17 +129,18 @@ export function ItemGallery({
                 onClick={() => setSelectedIndex(index)}
                 aria-label={`Show ${title}, photo ${index + 1}`}
                 aria-current={isActive ? "true" : undefined}
-                className={`aspect-square min-h-11 overflow-hidden rounded-lg transition-opacity focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                className={`relative aspect-square min-h-11 overflow-hidden rounded-lg transition-opacity focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 ${
                   isActive
                     ? "border-2 border-foreground opacity-100"
                     : "border border-black/15 opacity-65 hover:opacity-100 dark:border-white/20"
                 }`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={photoUrl}
                   alt={`${title}, photo ${index + 1}`}
-                  className="h-full w-full object-cover"
+                  fill
+                  sizes="(max-width: 479px) calc((100vw - 3.875rem) / 4), 100px"
+                  className="object-cover"
                 />
               </button>
             );
@@ -190,12 +194,13 @@ export function ItemGallery({
             Close
           </button>
         </div>
-        <div className="mt-3 flex items-center justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+        <div className="relative mt-3 h-[calc(100dvh-8rem)] min-h-64 max-h-[85vh] w-full">
+          <Image
             src={activePhoto}
             alt={`${title}, photo ${activeIndex + 1} full screen`}
-            className="max-h-[85vh] max-w-full object-contain"
+            fill
+            sizes="100vw"
+            className="object-contain"
           />
         </div>
       </dialog>

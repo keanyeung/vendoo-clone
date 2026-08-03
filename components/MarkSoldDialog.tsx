@@ -32,6 +32,7 @@ type MarkSoldItem = Pick<
   | "soldPlatform"
   | "soldDate"
   | "platformFees"
+  | "shippingCost"
 >;
 
 export type MarkSoldDialogProps = {
@@ -47,6 +48,7 @@ type FormState = {
   soldPlatform: Platform | "";
   soldDate: string;
   platformFees: string;
+  shippingCost: string;
 };
 
 const platforms = [
@@ -119,6 +121,10 @@ function deriveFormState(
         item.platformFees === null
           ? ""
           : moneyFieldValue(item.platformFees),
+      shippingCost:
+        item.shippingCost === null
+          ? ""
+          : moneyFieldValue(item.shippingCost),
     };
   }
 
@@ -127,6 +133,7 @@ function deriveFormState(
     soldPlatform: "",
     soldDate: localDate(),
     platformFees: "",
+    shippingCost: "",
   };
 }
 
@@ -156,6 +163,7 @@ export default function MarkSoldDialog({
     soldPlatform: "",
     soldDate: localDate(),
     platformFees: "",
+    shippingCost: "",
   });
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -261,6 +269,14 @@ export default function MarkSoldDialog({
     }));
   }
 
+  function handleShippingChange(event: ChangeEvent<HTMLInputElement>): void {
+    clearFieldError("shippingCost");
+    setForm((current) => ({
+      ...current,
+      shippingCost: event.target.value,
+    }));
+  }
+
   function handleDateChange(event: ChangeEvent<HTMLInputElement>): void {
     clearFieldError("soldDate");
     setForm((current) => ({ ...current, soldDate: event.target.value }));
@@ -284,6 +300,7 @@ export default function MarkSoldDialog({
       soldPlatform: form.soldPlatform,
       soldDate: form.soldDate,
       platformFees: parseMoney(form.platformFees),
+      shippingCost: parseMoney(form.shippingCost),
     };
     const parsed = MarkSoldSchema.safeParse(payload);
 
@@ -343,11 +360,13 @@ export default function MarkSoldDialog({
 
   const soldPrice = parseMoney(form.soldPrice);
   const platformFees = parseMoney(form.platformFees) ?? 0;
+  const shippingCost = parseMoney(form.shippingCost);
   const preview = item
     ? {
         soldPrice,
         purchasePrice: item.purchasePrice,
         platformFees,
+        shippingCost,
       }
     : null;
   const profit = preview === null ? null : computeProfit(preview);
@@ -542,6 +561,42 @@ export default function MarkSoldDialog({
           </div>
 
           <div className="space-y-1.5">
+            <label
+              htmlFor="dialog-shipping-cost"
+              className="text-sm font-medium"
+            >
+              Shipping cost
+            </label>
+            <div className="relative">
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-base"
+              >
+                $
+              </span>
+              <input
+                id="dialog-shipping-cost"
+                type="text"
+                inputMode="decimal"
+                value={form.shippingCost}
+                onChange={handleShippingChange}
+                onBlur={() =>
+                  setForm((current) => ({
+                    ...current,
+                    shippingCost: normalizeMoney(current.shippingCost),
+                  }))
+                }
+                disabled={isSaving}
+                className={`${control} pl-7`}
+              />
+            </div>
+            <p className="text-xs text-black/60 dark:text-white/60">
+              Enter $0 for no shipping cost; leave blank if it is unknown.
+            </p>
+            <ErrorText name="shippingCost" errors={fieldErrors} />
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
             <label htmlFor="dialog-sell-date" className="text-sm font-medium">
               Sold date
             </label>
@@ -609,7 +664,8 @@ export default function MarkSoldDialog({
               <p className="mt-2 font-mono text-sm text-black/60 dark:text-white/60">
                 {currencyFormatter.format(soldPrice ?? 0)} −{" "}
                 {currencyFormatter.format(item.purchasePrice)} paid −{" "}
-                {currencyFormatter.format(platformFees)} fees
+                {currencyFormatter.format(platformFees)} fees −{" "}
+                {currencyFormatter.format(shippingCost ?? 0)} shipping
               </p>
             )}
             {warning && (

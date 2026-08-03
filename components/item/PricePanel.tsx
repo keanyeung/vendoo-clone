@@ -1,21 +1,22 @@
+"use client";
+
+import { useItemDetail } from "@/components/item/ItemDetailProvider";
+import QuickEditField from "@/components/item/QuickEditField";
 import { computeProfit, computeRoi } from "@/lib/analytics";
 import type { SellableItem } from "@/lib/analytics";
-import type { ItemDto } from "@/lib/item-dto";
 import { formatPrice } from "@/lib/listing-text";
 import {
   PROFIT_TONE_CLASSES,
   profitTone,
 } from "@/lib/profit-tone";
 
-type PricePanelProps = {
-  item: ItemDto;
-};
-
-export function PricePanel({ item }: PricePanelProps) {
+export function PricePanel() {
+  const { item } = useItemDetail();
   const projection: SellableItem = {
     soldPrice: item.listPrice,
     purchasePrice: item.purchasePrice,
     platformFees: null,
+    shippingCost: null,
   };
   // The projection always has a sold price, so computeProfit cannot return null.
   const projectedProfit = computeProfit(projection) ?? 0;
@@ -42,9 +43,14 @@ export function PricePanel({ item }: PricePanelProps) {
           <dt className="text-sm text-black/60 dark:text-white/60">
             Listed at
           </dt>
-          <dd className="mt-1 text-[30px] font-semibold tracking-tight">
-            {formatPrice(item.listPrice)}
-          </dd>
+          <QuickEditField
+            field="listPrice"
+            label="List price"
+            as="dd"
+            containerClassName="mt-1"
+            valueClassName="text-[30px] font-semibold tracking-tight"
+            inputClassName="text-[24px] font-semibold tracking-tight"
+          />
         </div>
 
         <div>

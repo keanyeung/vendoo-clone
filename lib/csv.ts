@@ -8,6 +8,7 @@ const SOLD_ITEMS_HEADER = [
   "Sold price",
   "Paid",
   "Fees",
+  "Shipping",
   "Profit",
   "ROI",
 ] as const;
@@ -29,6 +30,7 @@ export function buildSoldItemsCsv(sales: Sale[]): string {
     sale.soldPrice,
     sale.purchasePrice,
     sale.fees,
+    sale.shipping ?? "",
     sale.profit,
     sale.roiPct ?? "",
   ]);

@@ -6,6 +6,10 @@ import {
 } from "./listing-filters";
 import { parsePage } from "./listing-page";
 import {
+  isPostingPlatform,
+  type PostingPlatform,
+} from "./postings";
+import {
   DEFAULT_SORT,
   parseSort,
   serializeSort,
@@ -20,6 +24,7 @@ export type ListingContext = {
   status: ItemStatus | "";
   q: string;
   attention: AttentionFilterKey | "";
+  notOn: PostingPlatform | "";
   sort: string;
   view: "grid" | "table";
   page: number;
@@ -55,11 +60,13 @@ function parseDirectContext(source: ListingContextInput): ListingContext {
   const rawStatus = readParam(source, "status");
   const rawAttention = readParam(source, "attention");
   const rawSort = readParam(source, "sort");
+  const rawNotOn = readParam(source, "notOn");
 
   return {
     status: isItemStatus(rawStatus) ? rawStatus : "",
     q: readParam(source, "q").trim(),
     attention: isAttentionFilterKey(rawAttention) ? rawAttention : "",
+    notOn: isPostingPlatform(rawNotOn) ? rawNotOn : "",
     sort: serializeSort(parseSort(rawSort)),
     view: readParam(source, "view") === "table" ? "table" : "grid",
     page: parsePage(readParam(source, "page")),
@@ -82,6 +89,7 @@ export function buildListingsHref(params: ListingContextInput): string {
   if (context.status) query.set("status", context.status);
   if (context.q) query.set("q", context.q);
   if (context.attention) query.set("attention", context.attention);
+  if (context.notOn) query.set("notOn", context.notOn);
   if (context.sort !== DEFAULT_SORT_VALUE) query.set("sort", context.sort);
   if (context.view === "table") query.set("view", context.view);
   if (context.page > 1) query.set("page", String(context.page));

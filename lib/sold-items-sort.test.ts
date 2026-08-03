@@ -19,6 +19,7 @@ function sale(overrides: Partial<Sale> = {}): Sale {
     soldPrice: 50,
     purchasePrice: 20,
     fees: 5,
+    shipping: null,
     profit: 25,
     roiPct: 125,
     daysToSell: 14,

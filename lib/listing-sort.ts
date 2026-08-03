@@ -1,4 +1,5 @@
 import type { ItemDto } from "@/lib/item-dto";
+import { livePlatforms, type PostingState } from "./postings";
 
 // Sorting stays in memory because computed columns such as days listed (and
 // later profit) cannot be expressed with Prisma orderBy.
@@ -11,7 +12,9 @@ type SortableItem = Pick<
   | "soldDate"
   | "status"
   | "title"
->;
+> & {
+  postings: readonly PostingState[];
+};
 
 export type SortDir = "asc" | "desc";
 export type SortField =
@@ -20,6 +23,7 @@ export type SortField =
   | "sold"
   | "soldDate"
   | "days"
+  | "channels"
   | "status"
   | "title";
 export type SortToken = { field: SortField; dir: SortDir };
@@ -33,6 +37,8 @@ export const SORT_OPTIONS = [
   { token: { field: "price", dir: "asc" }, label: "List price (low to high)" },
   { token: { field: "days", dir: "desc" }, label: "Days listed (longest first)" },
   { token: { field: "days", dir: "asc" }, label: "Days listed (shortest first)" },
+  { token: { field: "channels", dir: "desc" }, label: "Channels (most first)" },
+  { token: { field: "channels", dir: "asc" }, label: "Channels (fewest first)" },
   { token: { field: "title", dir: "asc" }, label: "Title (A to Z)" },
   { token: { field: "title", dir: "desc" }, label: "Title (Z to A)" },
   { token: { field: "status", dir: "asc" }, label: "Status (draft to sold)" },
@@ -49,6 +55,7 @@ const sortFields = new Set<SortField>([
   "sold",
   "soldDate",
   "days",
+  "channels",
   "status",
   "title",
 ]);
@@ -117,6 +124,8 @@ export function sortItems<T extends SortableItem>(
     soldDate: (a, b) =>
       Date.parse(a.soldDate ?? "") - Date.parse(b.soldDate ?? ""),
     days: (a, b) => daysListed(a, now) - daysListed(b, now),
+    channels: (a, b) =>
+      livePlatforms(a.postings).length - livePlatforms(b.postings).length,
     status: (a, b) => statusRanks[a.status] - statusRanks[b.status],
     title: (a, b) =>
       a.title.localeCompare(b.title, undefined, { sensitivity: "base" }),

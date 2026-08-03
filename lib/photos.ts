@@ -1,3 +1,18 @@
+export const ORPHANED_UPLOAD_MIN_AGE_MS = 24 * 60 * 60 * 1000;
+
+export function isPhotoObjectOlderThanMinimum(
+  createdAt: string | null,
+  now: Date,
+): boolean {
+  if (createdAt === null) return false;
+
+  const createdAtMs = Date.parse(createdAt);
+  return (
+    Number.isFinite(createdAtMs) &&
+    createdAtMs < now.getTime() - ORPHANED_UPLOAD_MIN_AGE_MS
+  );
+}
+
 export function getAppPhotoObjectPath(
   publicUrl: string,
   supabaseUrl: string,

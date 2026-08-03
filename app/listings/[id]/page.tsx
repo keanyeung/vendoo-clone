@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { CopyListingSection } from "@/components/CopyListingSection";
+import { ListingChannels } from "@/components/item/ChannelTiles";
 import { ItemActionBar } from "@/components/item/ItemActionBar";
 import { ItemDetailProvider } from "@/components/item/ItemDetailProvider";
 import { ItemGallery } from "@/components/item/ItemGallery";
@@ -15,7 +15,10 @@ import {
   buildListingQuery,
   buildListingsHref,
 } from "@/lib/listing-context";
-import { ATTENTION_FILTERS } from "@/lib/listing-filters";
+import {
+  ATTENTION_FILTERS,
+  isMissingPostingPlatform,
+} from "@/lib/listing-filters";
 import { sortItems } from "@/lib/listing-sort";
 import { getListingBody } from "@/lib/listing-text";
 
@@ -78,7 +81,10 @@ export default async function ItemDetailPage(
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const [item, neighbourRows] = await Promise.all([
-    prisma.item.findUnique({ where: { id } }),
+    prisma.item.findUnique({
+      where: { id },
+      include: { postings: true },
+    }),
     from === null
       ? Promise.resolve(null)
       : prisma.item.findMany({
@@ -94,6 +100,12 @@ export default async function ItemDetailPage(
             platformFees: true,
             status: true,
             title: true,
+            postings: {
+              select: {
+                platform: true,
+                removedAt: true,
+              },
+            },
           },
         }),
   ]);
@@ -116,10 +128,20 @@ export default async function ItemDetailPage(
       row.platformFees === null ? null : Number(row.platformFees),
     status: row.status,
     title: row.title,
+    postings: row.postings.map((posting) => ({
+      platform: posting.platform,
+      removedAt: posting.removedAt?.toISOString() ?? null,
+    })),
   }));
-  const matchingNeighbourDtos = attentionFilter
+  const attentionNeighbourDtos = attentionFilter
     ? neighbourDtos?.filter((row) => attentionFilter.matches(row, now))
     : neighbourDtos;
+  const notOn = listingQuery.notOn;
+  const matchingNeighbourDtos = notOn
+    ? attentionNeighbourDtos?.filter((row) =>
+        isMissingPostingPlatform(row, notOn),
+      )
+    : attentionNeighbourDtos;
   const orderedIds =
     matchingNeighbourDtos == null
       ? null
@@ -146,7 +168,7 @@ export default async function ItemDetailPage(
   const updatedDate = formatDate(itemDto.updatedAt);
 
   return (
-    <ItemDetailProvider>
+    <ItemDetailProvider initialItem={itemDto}>
       <ListingSavedToast
         itemId={itemDto.id}
         show={searchParams.saved === "1"}
@@ -169,10 +191,10 @@ export default async function ItemDetailPage(
             {itemDto.status === "SOLD" ? (
               <SaleSummary item={itemDto} />
             ) : (
-              <PricePanel item={itemDto} />
+              <PricePanel />
             )}
 
-            <CopyListingSection item={itemDto} />
+            <ListingChannels item={itemDto} />
 
             <section className="mt-8 rounded-xl border border-black/15 p-6 dark:border-white/20">
               <h2 className="text-lg font-semibold">Listing content</h2>

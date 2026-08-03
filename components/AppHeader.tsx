@@ -18,6 +18,9 @@ function isActive(pathname: string, href: string): boolean {
 
 export default function AppHeader() {
   const pathname = usePathname();
+  const contentWidth =
+    pathname === "/listings" ? "max-w-[1600px]" : "max-w-[1120px]";
+  const contentPadding = pathname === "/listings" ? "xl:px-8" : "";
 
   // app/login/layout.tsx is nested inside the root layout, so it cannot remove
   // anything the root renders. Opting out here is what keeps /login chrome-free.
@@ -46,7 +49,7 @@ export default function AppHeader() {
       {/* Tighter padding and cluster gap below sm: at 390px the nav and both buttons
           need every pixel, and anything wider than the viewport scrolls the whole page. */}
       <div
-        className={`mx-auto h-15 max-w-[1120px] items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6 ${
+        className={`mx-auto h-15 ${contentWidth} ${contentPadding} items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6 ${
           pathname === "/new" ? "hidden lg:flex" : "flex"
         }`}
       >

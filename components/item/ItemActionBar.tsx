@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { useItemDetail } from "@/components/item/ItemDetailProvider";
+import QuickEditField from "@/components/item/QuickEditField";
 import type { ItemDto } from "@/lib/item-dto";
 import {
   buildListingsHref,
@@ -217,6 +218,49 @@ export function ItemActionBar({
     }
   }
 
+  async function handleDuplicate(): Promise<void> {
+    if (isPending) return;
+
+    setIsMenuOpen(false);
+    setError(null);
+    setIsPending(true);
+
+    try {
+      const response = await fetch(
+        `/api/items/${encodeURIComponent(item.id)}/duplicate`,
+        { method: "POST" },
+      );
+      if (!response.ok) {
+        setError(await readError(response, "Duplication"));
+        return;
+      }
+
+      let body: unknown = null;
+      try {
+        body = await response.json();
+      } catch {
+        // The shape check below provides the user-facing error.
+      }
+      if (
+        typeof body !== "object" ||
+        body === null ||
+        !("id" in body) ||
+        typeof body.id !== "string"
+      ) {
+        setError("The duplicate response was incomplete. Please try again.");
+        return;
+      }
+
+      router.push(`/new?draft=${encodeURIComponent(body.id)}`);
+    } catch {
+      setError(
+        "Could not reach the item service. Check your connection and try again.",
+      );
+    } finally {
+      setIsPending(false);
+    }
+  }
+
   async function handleDelete(): Promise<void> {
     if (isPending) return;
 
@@ -324,9 +368,14 @@ export function ItemActionBar({
           </nav>
         )}
 
-        <h1 className="min-w-0 flex-1 truncate text-sm font-semibold sm:text-base">
-          {item.title}
-        </h1>
+        <QuickEditField
+          field="title"
+          label="Title"
+          as="h1"
+          containerClassName="min-w-0 flex-1"
+          valueClassName="truncate text-sm font-semibold sm:text-base"
+          inputClassName="text-sm font-semibold sm:text-base"
+        />
 
         <span
           className={`hidden shrink-0 rounded-full px-2.5 py-1 text-xs font-medium sm:inline ${status.className}`}
@@ -391,12 +440,11 @@ export function ItemActionBar({
                 <button
                   type="button"
                   role="menuitem"
-                  disabled
-                  aria-disabled="true"
-                  title="Duplicate as new listing is not available yet."
-                  className="flex min-h-11 w-full cursor-not-allowed items-center rounded-md px-3 text-left text-sm text-black/35 dark:text-white/35"
+                  onClick={() => void handleDuplicate()}
+                  disabled={isPending}
+                  className="flex min-h-11 w-full items-center rounded-md px-3 text-left text-sm hover:bg-black/[.05] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[.07]"
                 >
-                  Duplicate as new listing
+                  {isPending ? "Duplicating…" : "Duplicate as new listing"}
                 </button>
                 <button
                   type="button"
@@ -471,8 +519,8 @@ export function ItemActionBar({
         `}</style>
         <h2 className="text-lg font-semibold">Delete item?</h2>
         <p className="mt-3 text-sm leading-6 text-black/70 dark:text-white/70">
-          This permanently deletes the item and removes its photos from storage.
-          This cannot be undone.
+          This permanently deletes the item and removes photos that no other
+          item uses. This cannot be undone.
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           <button

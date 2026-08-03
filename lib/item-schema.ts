@@ -7,6 +7,14 @@ import {
 import { MAX_FILES } from "./upload-limits";
 
 // Single shared contract for creating an inventory item, used by the form and API route so neither can drift.
+export const ITEM_TITLE_MAX_LENGTH = 140;
+const COPY_TITLE_SUFFIX = " (copy)";
+
+export function buildDuplicateTitle(title: string): string {
+  const availableLength = ITEM_TITLE_MAX_LENGTH - COPY_TITLE_SUFFIX.length;
+  return `${title.slice(0, availableLength).trimEnd()}${COPY_TITLE_SUFFIX}`;
+}
+
 const hasAtMostTwoDecimals = (value: number): boolean =>
   Math.round(value * 100) / 100 === value;
 
@@ -37,7 +45,7 @@ const sharedItemFields = {
     .string()
     .trim()
     .min(1, { message: "Title is required." })
-    .max(140),
+    .max(ITEM_TITLE_MAX_LENGTH),
   summary: z.string().nullable(),
   description: z
     .string()
@@ -93,6 +101,10 @@ export const CreateItemSchema = z
 
 const draftItemFields = {
   ...sharedItemFields,
+  // A photo-only or manual-entry draft exists before listing copy is known.
+  // The strict create schema still requires both fields before publishing.
+  title: z.string().max(ITEM_TITLE_MAX_LENGTH),
+  description: z.string(),
   category: z.string().trim().nullable(),
   listPrice: money.nonnegative().optional(),
   purchasePrice: money.nonnegative({
@@ -138,7 +150,7 @@ export const UpdateItemSchema = z.object({
     .string()
     .trim()
     .min(1, { message: "Title is required." })
-    .max(140),
+    .max(ITEM_TITLE_MAX_LENGTH),
   summary: z.string().nullable(),
   description: z
     .string()
@@ -169,6 +181,29 @@ export const UpdateItemSchema = z.object({
   // AI reference fields, status, and sale fields have separate ownership or actions.
 });
 
+export const PatchItemFieldsSchema = z
+  .object({
+    title: UpdateItemSchema.shape.title.optional(),
+    listPrice: UpdateItemSchema.shape.listPrice.optional(),
+  })
+  .strict()
+  .refine(
+    (fields): boolean =>
+      fields.title !== undefined || fields.listPrice !== undefined,
+    { message: "Provide a title or list price to update." },
+  );
+
+export const ApplyAnalysisSchema = UpdateItemSchema.extend({
+  suggestedPrice: money.nonnegative(),
+  priceLow: money.nonnegative(),
+  priceHigh: money.nonnegative(),
+  priceReasoning: z.string(),
+  aiConfidence: z.enum(CONFIDENCE_VALUES),
+}).refine(hasOrderedPriceRange, {
+  message: "Price low cannot be greater than price high.",
+  path: ["priceHigh"],
+});
+
 export const MarkSoldSchema = z.object({
   soldPrice: money.positive({
     message: "Sold price must be greater than 0.",
@@ -190,11 +225,34 @@ export const MarkSoldSchema = z.object({
       message: "Platform fees cannot be negative.",
     })
     .nullable(),
+  shippingCost: money
+    .nonnegative({
+      message: "Shipping cost cannot be negative.",
+    })
+    .nullable(),
 });
 
 export const SetStatusSchema = z.object({
   // SOLD requires the complete sale record supplied by the mark_sold action.
   status: z.enum(["DRAFT", "LISTED"]),
+});
+
+const postingPlatform = z.enum(["FB_MARKETPLACE", "DEPOP", "EBAY"]);
+const postingUrl = z
+  .string()
+  .trim()
+  .url({ message: "Listing URL is invalid." })
+  .max(2048, { message: "Listing URL is too long." })
+  .nullable()
+  .optional();
+
+export const UpsertItemPostingSchema = z.object({
+  platform: postingPlatform,
+  url: postingUrl,
+});
+
+export const RemoveItemPostingSchema = z.object({
+  platform: postingPlatform,
 });
 
 export const ItemMutationSchema = z.discriminatedUnion("action", [
@@ -205,6 +263,14 @@ export const ItemMutationSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("update_draft"),
     data: UpdateDraftItemSchema,
+  }),
+  z.object({
+    action: z.literal("patch_fields"),
+    data: PatchItemFieldsSchema,
+  }),
+  z.object({
+    action: z.literal("apply_analysis"),
+    data: ApplyAnalysisSchema,
   }),
   z.object({
     action: z.literal("mark_sold"),
@@ -243,8 +309,16 @@ export const BulkItemMutationSchema = z.discriminatedUnion("action", [
 
 export type UpdateItemInput = z.infer<typeof UpdateItemSchema>;
 export type UpdateDraftItemInput = z.infer<typeof UpdateDraftItemSchema>;
+export type PatchItemFieldsInput = z.infer<typeof PatchItemFieldsSchema>;
+export type ApplyAnalysisInput = z.infer<typeof ApplyAnalysisSchema>;
 export type MarkSoldInput = z.infer<typeof MarkSoldSchema>;
 export type EditSaleInput = z.infer<typeof MarkSoldSchema>;
 export type SetStatusInput = z.infer<typeof SetStatusSchema>;
+export type UpsertItemPostingInput = z.infer<
+  typeof UpsertItemPostingSchema
+>;
+export type RemoveItemPostingInput = z.infer<
+  typeof RemoveItemPostingSchema
+>;
 export type ItemMutationInput = z.infer<typeof ItemMutationSchema>;
 export type BulkItemMutationInput = z.infer<typeof BulkItemMutationSchema>;

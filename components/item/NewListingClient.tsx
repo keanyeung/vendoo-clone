@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { ControlledCopyListingSection } from "@/components/CopyListingSection";
@@ -12,7 +13,9 @@ import {
   buildDraftItemInput,
   buildDraftItemDto,
   buildDraftMutationData,
+  createEmptyItemDraft,
   createItemDraft,
+  mergeAnalysisIntoEmptyFields,
   type DraftStep,
   type DraftItemStatus,
   type ItemDraft,
@@ -80,18 +83,25 @@ export default function NewListingClient({
   fallbackMessage: string | null;
   resumeBanner: ReactNode;
 }) {
+  const initialVisibleDraft =
+    initialDraft?.draftStep === "photos" ? null : initialDraft?.draft ?? null;
+  const initiallyManual =
+    initialVisibleDraft !== null && initialDraft?.analysis === null;
   const photoCollection = usePhotoCollection(initialDraft?.photos ?? []);
   const [analysis, setAnalysis] = useState<Analysis | null>(
     initialDraft?.analysis ?? null,
   );
   const [usage, setUsage] = useState<AnalysisUsage | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [isStartingManual, setIsStartingManual] = useState<boolean>(false);
+  const [isManualEntry, setIsManualEntry] = useState<boolean>(initiallyManual);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [manualError, setManualError] = useState<string | null>(null);
   const [analysisKey, setAnalysisKey] = useState<number>(
     initialDraft?.analysis ? 1 : 0,
   );
   const [draft, setDraft] = useState<ItemDraft | null>(
-    initialDraft?.analysis === null ? null : initialDraft?.draft ?? null,
+    initialVisibleDraft,
   );
   const [draftId, setDraftId] = useState<string | null>(
     initialDraft?.id ?? null,
@@ -109,9 +119,10 @@ export default function NewListingClient({
   const readyPhotoUrlsRef = useRef<string[]>(initialDraft?.photos ?? []);
   const draftIdRef = useRef<string | null>(initialDraft?.id ?? null);
   const draftRef = useRef<ItemDraft | null>(
-    initialDraft?.analysis === null ? null : initialDraft?.draft ?? null,
+    initialVisibleDraft,
   );
   const baseDraftRef = useRef<ItemDraft | null>(initialDraft?.draft ?? null);
+  const manualEntryRef = useRef(initiallyManual);
   const draftStepRef = useRef<DraftStep>(initialDraft?.draftStep ?? "photos");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightSaveRef = useRef(false);
@@ -127,7 +138,7 @@ export default function NewListingClient({
   );
   const readyPhotoUrlsKey = JSON.stringify(readyPhotoUrls);
   const hasPhotos = readyPhotoUrls.length > 0;
-  const hasAnalysis = analysis !== null && draft !== null;
+  const hasDetails = draft !== null;
   const purchasePriceValue =
     draft === null || draft.purchasePrice.trim() === ""
       ? Number.NaN
@@ -343,6 +354,16 @@ export default function NewListingClient({
   useEffect((): void => {
     if (uploadedUrlsKeyRef.current === readyPhotoUrlsKey) return;
     uploadedUrlsKeyRef.current = readyPhotoUrlsKey;
+    const currentDraft = draftRef.current;
+    if (manualEntryRef.current && currentDraft !== null) {
+      const nextDraft = { ...currentDraft, photos: readyPhotoUrls };
+      draftRef.current = nextDraft;
+      baseDraftRef.current = nextDraft;
+      setDraft(nextDraft);
+      listingCopyResetRef.current();
+      queueDraftSave(nextDraft, readyPhotoUrls, "reviewed", true);
+      return;
+    }
     setAnalysis(null);
     draftRef.current = null;
     setDraft(null);
@@ -357,6 +378,85 @@ export default function NewListingClient({
     // readyPhotoUrlsKey is the intentional change detector for add/remove/reorder.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readyPhotoUrlsKey]);
+
+  async function handleManualEntry(): Promise<void> {
+    if (readyPhotoUrls.length === 0 || isStartingManual || isAnalyzing) return;
+    const emptyDraft = createEmptyItemDraft([...readyPhotoUrls]);
+    const parsed = DraftItemSchema.safeParse(
+      buildDraftItemInput(emptyDraft, "reviewed"),
+    );
+    if (!parsed.success) {
+      setManualError("The manual draft could not be prepared. Please try again.");
+      return;
+    }
+
+    setErrorMessage(null);
+    setManualError(null);
+    setIsStartingManual(true);
+    try {
+      let id = draftIdRef.current;
+      if (id === null) {
+        const response = await fetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(parsed.data),
+        });
+        let body: unknown = null;
+        try {
+          body = await response.json();
+        } catch {
+          // Keep the status-based fallback for a non-JSON response.
+        }
+        if (!response.ok || !isRecord(body) || typeof body.id !== "string") {
+          setManualError(
+            isRecord(body) && typeof body.error === "string"
+              ? body.error
+              : `Draft creation failed with status ${response.status}.`,
+          );
+          return;
+        }
+        id = body.id;
+        draftIdRef.current = id;
+        setDraftId(id);
+        lastSavedRevisionRef.current = revisionRef.current;
+        window.history.replaceState(
+          null,
+          "",
+          `/new?draft=${encodeURIComponent(id)}`,
+        );
+      } else {
+        const revision = queueDraftSave(
+          emptyDraft,
+          emptyDraft.photos,
+          "reviewed",
+          false,
+        );
+        if (revision === null || !(await waitForSave(revision))) {
+          setManualError("The manual draft could not be saved. Please try again.");
+          return;
+        }
+      }
+
+      manualEntryRef.current = true;
+      setIsManualEntry(true);
+      draftStepRef.current = "reviewed";
+      draftRef.current = emptyDraft;
+      baseDraftRef.current = emptyDraft;
+      setDraft(emptyDraft);
+      setAnalysis(null);
+      setUsage(null);
+      setAutosaveError(null);
+      setAutosavePhase("saved");
+      listingCopy.reset();
+      setAnalysisKey((current: number): number => current + 1);
+    } catch {
+      setManualError(
+        "Could not reach the save service. Check your connection and try again.",
+      );
+    } finally {
+      setIsStartingManual(false);
+    }
+  }
 
   async function handleAnalyze(): Promise<void> {
     if (readyPhotoUrls.length === 0 || isAnalyzing) return;
@@ -410,9 +510,19 @@ export default function NewListingClient({
       }
       if (uploadedUrlsKeyRef.current === requestedUrlsKey) {
         const result = body as AnalyzeResponse;
-        const analyzedDraft = createItemDraft(result.analysis, requestedUrls);
+        const manualDraft = manualEntryRef.current ? draftRef.current : null;
+        const analyzedDraft =
+          manualDraft === null
+            ? createItemDraft(result.analysis, requestedUrls)
+            : mergeAnalysisIntoEmptyFields(
+                manualDraft,
+                result.analysis,
+                requestedUrls,
+              );
+        const analyzedStep: DraftStep =
+          manualDraft === null ? "analyzed" : "reviewed";
         const parsed = DraftItemSchema.safeParse(
-          buildDraftItemInput(analyzedDraft, "analyzed"),
+          buildDraftItemInput(analyzedDraft, analyzedStep),
         );
         if (!parsed.success) {
           setErrorMessage("The analyzed draft was incomplete. Please try again.");
@@ -448,7 +558,7 @@ export default function NewListingClient({
           draftIdRef.current = id;
           setDraftId(id);
           baseDraftRef.current = analyzedDraft;
-          draftStepRef.current = "analyzed";
+          draftStepRef.current = analyzedStep;
           lastSavedRevisionRef.current = revisionRef.current;
           setAutosaveError(null);
           setAutosavePhase("saved");
@@ -461,7 +571,7 @@ export default function NewListingClient({
           const revision = queueDraftSave(
             analyzedDraft,
             requestedUrls,
-            "analyzed",
+            analyzedStep,
             false,
           );
           if (revision === null || !(await waitForSave(revision))) {
@@ -472,7 +582,12 @@ export default function NewListingClient({
 
         if (uploadedUrlsKeyRef.current !== requestedUrlsKey) {
           const currentUrls = readyPhotoUrlsRef.current;
-          queueDraftSave(analyzedDraft, currentUrls, "photos", true);
+          const latestManualDraft = draftRef.current;
+          if (manualEntryRef.current && latestManualDraft !== null) {
+            queueDraftSave(latestManualDraft, currentUrls, "reviewed", true);
+          } else {
+            queueDraftSave(analyzedDraft, currentUrls, "photos", true);
+          }
           return;
         }
 
@@ -657,7 +772,7 @@ export default function NewListingClient({
       <>
         <main
           className={`mx-auto w-full max-w-[1120px] flex-1 px-4 pt-6 sm:px-6 lg:pt-8 lg:pb-16 ${
-            hasAnalysis ? "pb-32" : "pb-16"
+            hasDetails ? "pb-32" : "pb-16"
           }`}
         >
           <div className="flex items-start justify-between gap-4 lg:items-end">
@@ -667,7 +782,7 @@ export default function NewListingClient({
               </h1>
               <p
                 className={`mt-1 text-sm text-black/60 dark:text-white/60 ${
-                  hasAnalysis ? "hidden lg:block" : ""
+                  hasDetails ? "hidden lg:block" : ""
                 }`}
               >
                 Copy the text into Facebook, Depop or eBay, then save the item
@@ -675,28 +790,27 @@ export default function NewListingClient({
               </p>
               <ol
                 aria-label="Listing progress"
-                className={`mt-3 items-center gap-2 text-xs font-medium text-black/60 dark:text-white/60 ${
-                  hasAnalysis ? "hidden lg:flex" : "flex"
-                }`}
+                className="mt-3 flex items-center gap-2 text-xs font-medium text-black/60 dark:text-white/60"
               >
                 <li className="text-foreground">
                   Photos{hasPhotos ? " ✓" : ""}
                 </li>
                 <li aria-hidden="true">›</li>
                 <li className={hasPhotos ? "text-foreground" : undefined}>
-                  Analyzed{hasAnalysis ? " ✓" : ""}
+                  {isManualEntry ? "Details" : "Analyzed"}
+                  {hasDetails ? " ✓" : ""}
                 </li>
                 <li aria-hidden="true">›</li>
                 <li
-                  aria-current={hasAnalysis ? "step" : undefined}
-                  className={hasAnalysis ? "text-foreground" : undefined}
+                  aria-current={hasDetails ? "step" : undefined}
+                  className={hasDetails ? "text-foreground" : undefined}
                 >
                   Post &amp; save
                 </li>
               </ol>
             </div>
 
-            {analysis && draft && previewItem && (
+            {draft && previewItem && (
               <div className="flex shrink-0 items-center gap-3">
               {usageLine && (
                 <p className="hidden text-right text-xs text-black/60 dark:text-white/60 lg:block">
@@ -705,11 +819,15 @@ export default function NewListingClient({
               )}
               <button
                 type="button"
-                disabled={isAnalyzing}
+                disabled={isAnalyzing || isStartingManual}
                 onClick={() => void handleAnalyze()}
                 className="min-h-11 rounded-md border border-black/15 px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20"
               >
-                Re-analyze
+                {isAnalyzing
+                  ? "Analyzing…"
+                  : analysis === null
+                    ? "Analyze photos"
+                    : "Re-analyze"}
               </button>
               <button
                 type="submit"
@@ -766,11 +884,52 @@ export default function NewListingClient({
                 )}
               </div>
             )}
+            {isAnalyzing && hasDetails && (
+              <div
+                aria-live="polite"
+                className="rounded-xl border border-black/15 bg-black/[.03] p-4 dark:border-white/20 dark:bg-white/[.04]"
+              >
+                <p className="font-medium">
+                  Analyzing {readyPhotoUrls.length}{" "}
+                  {readyPhotoUrls.length === 1 ? "photo" : "photos"}…
+                </p>
+                <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                  {isManualEntry
+                    ? "Your existing details will be kept; analysis only fills blank fields."
+                    : "This usually takes 15–30 seconds. You can keep this page open while the listing draft is prepared."}
+                </p>
+              </div>
+            )}
+            {errorMessage && hasDetails && (
+              <div
+                role="alert"
+                className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-red-600/30 bg-red-600/[.06] px-3 py-2 text-sm text-red-700 dark:border-red-400/30 dark:text-red-400"
+              >
+                <p>{errorMessage}</p>
+                <div className="flex shrink-0 gap-3 font-medium">
+                  <button
+                    type="button"
+                    disabled={isAnalyzing}
+                    onClick={() => void handleAnalyze()}
+                    className="disabled:opacity-60"
+                  >
+                    Try again
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setErrorMessage(null)}
+                    aria-label="Dismiss analysis error"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div
             className={`mt-3 grid items-start gap-4 ${
-              hasAnalysis
+              hasDetails
                 ? "lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]"
                 : "max-w-3xl"
             }`}
@@ -779,7 +938,7 @@ export default function NewListingClient({
               <PhotoManager
                 photos={photoCollection.photos}
                 lastRemoval={photoCollection.lastRemoval}
-                disabled={isSaving}
+                disabled={isSaving || isStartingManual}
                 reuploadOnUndo
                 onAddPhotos={photoCollection.addPhotos}
                 onUploadStarted={photoCollection.markPhotoUploadStarted}
@@ -805,7 +964,7 @@ export default function NewListingClient({
                   </button>
                 </div>
               )}
-              {analysis && draft && previewItem && (
+              {draft && previewItem && (
                 <ControlledCopyListingSection
                   item={previewItem}
                   copy={listingCopy}
@@ -814,16 +973,28 @@ export default function NewListingClient({
                 />
               )}
 
-              {readyPhotoUrls.length > 0 && !hasAnalysis && (
+              {readyPhotoUrls.length > 0 && !hasDetails && (
                 <section className="space-y-4">
-                  <button
-                    type="button"
-                    disabled={isAnalyzing}
-                    onClick={() => void handleAnalyze()}
-                    className="min-h-11 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Analyze photos
-                  </button>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      disabled={isAnalyzing || isStartingManual}
+                      onClick={() => void handleAnalyze()}
+                      className="min-h-11 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Analyze photos
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isAnalyzing || isStartingManual}
+                      onClick={() => void handleManualEntry()}
+                      className="min-h-11 rounded-md border border-black/15 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/20"
+                    >
+                      {isStartingManual
+                        ? "Opening details…"
+                        : "Enter details manually"}
+                    </button>
+                  </div>
                   {isAnalyzing && (
                     <div
                       aria-live="polite"
@@ -864,11 +1035,36 @@ export default function NewListingClient({
                       </div>
                     </div>
                   )}
+                  {manualError && (
+                    <div
+                      role="alert"
+                      className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-red-600/30 bg-red-600/[.06] px-3 py-2 text-sm text-red-700 dark:border-red-400/30 dark:text-red-400"
+                    >
+                      <p>{manualError}</p>
+                      <div className="flex shrink-0 gap-3 font-medium">
+                        <button
+                          type="button"
+                          disabled={isStartingManual}
+                          onClick={() => void handleManualEntry()}
+                          className="disabled:opacity-60"
+                        >
+                          Try again
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setManualError(null)}
+                          aria-label="Dismiss manual draft error"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </section>
               )}
             </div>
 
-            {analysis && draft && previewItem && (
+            {draft && previewItem && (
               <ItemForm
                 key={analysisKey}
                 draft={draft}
@@ -883,14 +1079,14 @@ export default function NewListingClient({
             )}
           </div>
 
-          {hasAnalysis && usageLine && (
+          {hasDetails && usageLine && (
             <p className="mt-4 text-center text-xs text-black/60 dark:text-white/60 lg:hidden">
               {usageLine}
             </p>
           )}
         </main>
 
-        {analysis && draft && previewItem && (
+        {draft && previewItem && (
           <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/15 bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm dark:border-white/20 lg:hidden">
             <div className="mx-auto flex max-w-[1120px] gap-3 p-4">
               <button
@@ -926,6 +1122,7 @@ export default function NewListingClient({
     soldPrice: savedItem.listPrice,
     purchasePrice: savedItem.purchasePrice,
     platformFees: 0,
+    shippingCost: 0,
   };
   const potentialProfit = computeProfit(potentialSale);
   const potentialRoi = computeRoi(potentialSale);
@@ -953,10 +1150,13 @@ export default function NewListingClient({
 
         <div className="mt-5 flex items-center gap-3 rounded-lg border border-black/10 p-3 dark:border-white/15">
           {savedItem.photos[0] ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
+            <Image
               src={savedItem.photos[0]}
               alt=""
+              width={56}
+              height={56}
+              sizes="56px"
+              loading="eager"
               className="size-14 shrink-0 rounded-lg object-cover"
             />
           ) : (

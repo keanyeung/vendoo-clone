@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   ATTENTION_FILTERS,
   isAgingListing,
+  isListedButNotPosted,
   isMissingFeesSale,
+  isMissingPostingPlatform,
   isStaleDraft,
   type ListingFilterItem,
 } from "./listing-filters";
@@ -19,6 +21,7 @@ function makeItem(
     createdAt: new Date(NOW_MS).toISOString(),
     soldDate: null,
     platformFees: null,
+    postings: [],
     ...overrides,
   };
 }
@@ -97,11 +100,55 @@ describe("listing attention predicates", () => {
     ).toBe(false);
   });
 
+  it("treats removed postings as missing and only flags listed items posted nowhere", () => {
+    const removedFacebook = {
+      platform: "FB_MARKETPLACE" as const,
+      removedAt: "2026-08-01T00:00:00.000Z",
+    };
+    const liveDepop = { platform: "DEPOP" as const, removedAt: null };
+
+    expect(
+      isListedButNotPosted(
+        makeItem({ postings: [removedFacebook] }),
+        NOW_MS,
+      ),
+    ).toBe(true);
+    expect(
+      isListedButNotPosted(makeItem({ postings: [liveDepop] }), NOW_MS),
+    ).toBe(false);
+    expect(
+      isListedButNotPosted(
+        makeItem({ status: "DRAFT", postings: [] }),
+        NOW_MS,
+      ),
+    ).toBe(false);
+
+    expect(
+      isMissingPostingPlatform(
+        makeItem({ postings: [removedFacebook, liveDepop] }),
+        "FB_MARKETPLACE",
+      ),
+    ).toBe(true);
+    expect(
+      isMissingPostingPlatform(
+        makeItem({ postings: [removedFacebook, liveDepop] }),
+        "DEPOP",
+      ),
+    ).toBe(false);
+    expect(
+      isMissingPostingPlatform(
+        makeItem({ postings: [removedFacebook, liveDepop] }),
+        "EBAY",
+      ),
+    ).toBe(true);
+  });
+
   it("registers every supported attention filter once", () => {
     expect(ATTENTION_FILTERS.map((filter) => filter.key)).toEqual([
       "aging",
       "stale-drafts",
       "missing-fees",
+      "listed-unposted",
     ]);
   });
 });

@@ -5,7 +5,7 @@ import { daysListed } from "./listing-sort";
 // Single source of truth for profit math and dashboard aggregation, shared by the item detail page and analytics page.
 export type SellableItem = Pick<
   ItemDto,
-  "soldPrice" | "purchasePrice" | "platformFees"
+  "soldPrice" | "purchasePrice" | "platformFees" | "shippingCost"
 >;
 
 export function computeProfit(item: SellableItem): number | null {
@@ -13,7 +13,12 @@ export function computeProfit(item: SellableItem): number | null {
     return null;
   }
 
-  return item.soldPrice - item.purchasePrice - (item.platformFees ?? 0);
+  return (
+    item.soldPrice -
+    item.purchasePrice -
+    (item.platformFees ?? 0) -
+    (item.shippingCost ?? 0)
+  );
 }
 
 export function computeRoi(item: SellableItem): number | null {
@@ -69,6 +74,7 @@ export type AnalyticsSummary = {
   totalRevenue: number;
   totalCogs: number;
   totalFees: number;
+  totalShipping: number;
   totalProfit: number;
   allTimeProfit: number;
   avgProfitPerItem: number | null;
@@ -173,6 +179,7 @@ export function computeAnalytics(
   let totalRevenue = 0;
   let totalCogs = 0;
   let totalFees = 0;
+  let totalShipping = 0;
   let totalProfit = 0;
   let allTimeProfit = 0;
 
@@ -180,6 +187,7 @@ export function computeAnalytics(
     totalRevenue += item.soldPrice ?? 0;
     totalCogs += item.purchasePrice;
     totalFees += item.platformFees ?? 0;
+    totalShipping += item.shippingCost ?? 0;
     totalProfit += computeProfit(item) ?? 0;
   }
 
@@ -203,6 +211,7 @@ export function computeAnalytics(
     totalRevenue: round(totalRevenue, 2),
     totalCogs: round(totalCogs, 2),
     totalFees: round(totalFees, 2),
+    totalShipping: round(totalShipping, 2),
     totalProfit: round(totalProfit, 2),
     allTimeProfit: round(allTimeProfit, 2),
     avgProfitPerItem:
@@ -249,6 +258,7 @@ export type Sale = {
   soldPrice: number;
   purchasePrice: number;
   fees: number;
+  shipping: number | null;
   profit: number;
   roiPct: number | null;
   daysToSell: number;
@@ -265,7 +275,11 @@ export function toSales(items: ItemDto[]): Sale[] {
     // Unlike computeProfit, the ledger retains sold rows with no recorded price and treats that price as zero.
     const soldPrice = item.soldPrice ?? 0;
     const fees = item.platformFees ?? 0;
-    const profit = round(soldPrice - item.purchasePrice - fees, 2);
+    const shipping = item.shippingCost;
+    const profit = round(
+      soldPrice - item.purchasePrice - fees - (shipping ?? 0),
+      2,
+    );
 
     sales.push({
       id: item.id,
@@ -279,6 +293,7 @@ export function toSales(items: ItemDto[]): Sale[] {
       soldPrice,
       purchasePrice: item.purchasePrice,
       fees,
+      shipping,
       profit,
       roiPct:
         item.purchasePrice === 0
@@ -362,6 +377,7 @@ export type SalesSummary = {
   revenue: number;
   cost: number;
   fees: number;
+  shipping: number;
   profit: number;
   count: number;
   avgProfit: number | null;
@@ -374,6 +390,7 @@ export function summarize(sales: Sale[]): SalesSummary {
   let revenue = 0;
   let cost = 0;
   let fees = 0;
+  let shipping = 0;
   let profit = 0;
   let daysToSell = 0;
 
@@ -381,6 +398,7 @@ export function summarize(sales: Sale[]): SalesSummary {
     revenue += sale.soldPrice;
     cost += sale.purchasePrice;
     fees += sale.fees;
+    shipping += sale.shipping ?? 0;
     profit += sale.profit;
     daysToSell += sale.daysToSell;
   }
@@ -392,6 +410,7 @@ export function summarize(sales: Sale[]): SalesSummary {
     revenue: round(revenue, 2),
     cost: round(cost, 2),
     fees: round(fees, 2),
+    shipping: round(shipping, 2),
     profit: round(profit, 2),
     count,
     avgProfit: count === 0 ? null : round(profit / count, 2),

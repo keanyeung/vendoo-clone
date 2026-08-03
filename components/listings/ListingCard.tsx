@@ -1,5 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
 
+import ChannelIndicator from "@/components/listings/ChannelIndicator";
 import ListingRowActions from "@/components/listings/ListingRowActions";
 import { ListingSelectionCheckbox } from "@/components/listings/ListingsSelectionProvider";
 import { computeProfit, type SellableItem } from "@/lib/analytics";
@@ -16,6 +18,7 @@ type ListingCardProps = {
   itemHref: string;
   editHref: string;
   now: number;
+  imageEager?: boolean;
 };
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -28,6 +31,7 @@ export default function ListingCard({
   itemHref,
   editHref,
   now,
+  imageEager = false,
 }: ListingCardProps) {
   const photo = item.photos[0];
   const status = STATUS_STYLES[item.status];
@@ -44,6 +48,7 @@ export default function ListingCard({
     soldPrice: item.listPrice,
     purchasePrice: item.purchasePrice,
     platformFees: null,
+    shippingCost: null,
   };
   // The projection always has a sold price, so computeProfit cannot return null.
   const projectedProfit = computeProfit(projection) ?? 0;
@@ -59,19 +64,19 @@ export default function ListingCard({
       <Link
         href={itemHref}
         aria-label={`View ${item.title}`}
-        className="block overflow-hidden rounded-t-[11px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+        className="relative block aspect-square overflow-hidden rounded-t-[11px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
       >
         {photo ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photo}
-              alt={`Photo of ${item.title}`}
-              className="aspect-square w-full object-cover"
-            />
-          </>
+          <Image
+            src={photo}
+            alt={`Photo of ${item.title}`}
+            fill
+            sizes="(max-width: 639px) calc(100vw - 2rem), (max-width: 1023px) calc(50vw - 2.5rem), (max-width: 1279px) calc(33.333vw - 2.75rem), 370px"
+            loading={imageEager ? "eager" : "lazy"}
+            className="object-cover"
+          />
         ) : (
-          <div className="flex aspect-square w-full items-center justify-center bg-black/[.04] text-sm text-black/60 dark:bg-white/[.06] dark:text-white/60">
+          <div className="flex size-full items-center justify-center bg-black/[.04] text-sm text-black/60 dark:bg-white/[.06] dark:text-white/60">
             No photo
           </div>
         )}
@@ -103,6 +108,11 @@ export default function ListingCard({
             {metadata.join(" · ")}
           </p>
         )}
+
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className="text-black/60 dark:text-white/60">Channels</span>
+          <ChannelIndicator postings={item.postings} />
+        </div>
 
         <dl className="grid grid-cols-2 gap-3 border-t border-black/10 pt-3 text-sm dark:border-white/15">
           <div>

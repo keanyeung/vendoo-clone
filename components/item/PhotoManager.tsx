@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   type ChangeEvent,
   type DragEvent,
@@ -402,13 +403,27 @@ export function PhotoManager({
                     : "border-black/15 dark:border-white/15"
               } ${isDragged ? "opacity-40" : "opacity-100"} focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={photo.previewUrl}
-                alt=""
-                draggable={false}
-                className="size-full object-cover"
-              />
+              {photo.origin === "new" ? (
+                <>
+                  {/* Object URLs are local browser previews, so the Next.js image optimizer cannot fetch them. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.previewUrl}
+                    alt=""
+                    draggable={false}
+                    className="size-full object-cover"
+                  />
+                </>
+              ) : (
+                <Image
+                  src={photo.previewUrl}
+                  alt=""
+                  fill
+                  sizes="(max-width: 639px) calc((100vw - 4.5rem) / 2), 160px"
+                  draggable={false}
+                  className="object-cover"
+                />
+              )}
               <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-black/75 to-transparent" />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/80 to-transparent" />
 

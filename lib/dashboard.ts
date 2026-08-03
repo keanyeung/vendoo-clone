@@ -10,6 +10,7 @@ import type { MonthlyBucket } from "@/lib/analytics";
 import type { ItemDto } from "@/lib/item-dto";
 import {
   isAgingListing,
+  isListedButNotPosted,
   isMissingFeesSale,
   isStaleDraft,
 } from "@/lib/listing-filters";
@@ -17,7 +18,11 @@ import { daysListed } from "@/lib/listing-sort";
 
 // Every figure the homepage renders, computed in one pass from rows the page already fetched.
 export type AttentionItem = {
-  kind: "stale_draft" | "aging_listing" | "missing_fees";
+  kind:
+    | "stale_draft"
+    | "aging_listing"
+    | "missing_fees"
+    | "listed_unposted";
   title: string;
   detail: string;
   action: string;
@@ -136,6 +141,9 @@ function buildAttention(items: ItemDto[], nowMs: number): AttentionItem[] {
   const missingFees = items.filter(
     (item: ItemDto) => isMissingFeesSale(item, nowMs),
   );
+  const listedUnposted = items.filter(
+    (item: ItemDto) => isListedButNotPosted(item, nowMs),
+  );
 
   let oldestDraftDays = 0;
   for (const item of staleDrafts) {
@@ -167,13 +175,21 @@ function buildAttention(items: ItemDto[], nowMs: number): AttentionItem[] {
       href: "/listings?attention=missing-fees",
       count: missingFees.length,
     },
+    {
+      kind: "listed_unposted",
+      title: `${listedUnposted.length} listed ${listedUnposted.length === 1 ? "item" : "items"} not posted`,
+      detail: "Ready to crosspost",
+      action: "Post",
+      href: "/listings?attention=listed-unposted",
+      count: listedUnposted.length,
+    },
   ];
 
   // Sort is stable, so equal counts fall back to the declaration order above.
   return candidates
     .filter((entry: AttentionItem) => entry.count > 0)
     .sort((a, b) => b.count - a.count)
-    .slice(0, 3);
+    .slice(0, 4);
 }
 
 export function computeDashboard(

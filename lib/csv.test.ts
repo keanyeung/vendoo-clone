@@ -15,6 +15,7 @@ function sale(overrides: Partial<Sale> = {}): Sale {
     soldPrice: 1234.5,
     purchasePrice: 20,
     fees: 0,
+    shipping: null,
     profit: 1214.5,
     roiPct: 6072.5,
     daysToSell: 14,
@@ -24,13 +25,13 @@ function sale(overrides: Partial<Sale> = {}): Sale {
 
 describe("buildSoldItemsCsv", () => {
   const header =
-    "Item,Sold date,Platform,Sold price,Paid,Fees,Profit,ROI";
+    "Item,Sold date,Platform,Sold price,Paid,Fees,Shipping,Profit,ROI";
 
   it("emits the exact header and preserves raw numeric values", () => {
     const csv = buildSoldItemsCsv([sale()]);
 
     expect(csv.split("\r\n")[0]).toBe(header);
-    expect(csv).toContain(",1234.5,20,0,1214.5,6072.5");
+    expect(csv).toContain(",1234.5,20,0,,1214.5,6072.5");
     expect(csv).not.toContain("$1,234.50");
   });
 
@@ -47,11 +48,18 @@ describe("buildSoldItemsCsv", () => {
       sale({ platform: null, roiPct: null }),
     ]).split("\r\n")[1];
 
-    expect(row).toBe("Test item,2026-07-15,,1234.5,20,0,1214.5,");
+    expect(row).toBe("Test item,2026-07-15,,1234.5,20,0,,1214.5,");
   });
 
   it("exports zero fees as zero", () => {
-    expect(buildSoldItemsCsv([sale()])).toContain(",20,0,1214.5,");
+    expect(buildSoldItemsCsv([sale()])).toContain(",20,0,,1214.5,");
+
+  });
+
+  it("exports a recorded shipping cost", () => {
+    expect(buildSoldItemsCsv([sale({ shipping: 12 })])).toContain(
+      ",20,0,12,1214.5,",
+    );
   });
 
   it("returns the header alone for empty input", () => {

@@ -1,6 +1,16 @@
+"use client";
+
+import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import MarkSoldDialog from "@/components/MarkSoldDialog";
+import { UndoToast } from "@/components/UndoToast";
+import { computeProfit } from "@/lib/analytics";
 import type { DashboardSummary } from "@/lib/dashboard";
 import type { ItemDto } from "@/lib/item-dto";
+import type { MarkSoldInput } from "@/lib/item-schema";
 import { daysListed } from "@/lib/listing-sort";
 import { PLATFORM_LABELS } from "@/lib/platform-label";
 import { STATUS_STYLES } from "@/lib/status-style";
@@ -16,6 +26,33 @@ const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
 });
+
+type SaleToastState = {
+  itemId: string;
+  previousStatus: "DRAFT" | "LISTED";
+  message: string;
+  tone?: "default" | "error";
+};
+
+async function readResponseError(response: Response): Promise<string> {
+  let message = `Undo failed with status ${response.status}.`;
+
+  try {
+    const body: unknown = await response.json();
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "error" in body &&
+      typeof body.error === "string"
+    ) {
+      message = body.error;
+    }
+  } catch {
+    // Keep the status-based fallback when the response is not JSON.
+  }
+
+  return message;
+}
 
 // UTC because soldDate is persisted as UTC midnight from a date picker; formatting it in the
 // server's zone would render "Jul 23" for a sale the rest of the app buckets into Jul 24.
@@ -66,19 +103,78 @@ function buildMetaLine(item: ItemDto, now: number): string {
     .join(" · ");
 }
 
-// Intentionally server-rendered: every value is fixed at request time and nothing here is interactive.
 export default function DashboardListings({
   summary,
   now,
 }: DashboardListingsProps) {
+  const router = useRouter();
+  const [sellItem, setSellItem] = useState<ItemDto | null>(null);
+  const [saleToast, setSaleToast] = useState<SaleToastState | null>(null);
+  const [isUndoing, setIsUndoing] = useState(false);
   const chips = [
     { status: "LISTED", label: "Listed", count: summary.activeListings },
     { status: "DRAFT", label: "Drafts", count: summary.draftCount },
     { status: "SOLD", label: "Sold", count: summary.soldCount },
   ];
 
+  function handleSold(sale: MarkSoldInput): void {
+    if (sellItem === null) return;
+
+    const profit = computeProfit({
+      soldPrice: sale.soldPrice,
+      purchasePrice: sellItem.purchasePrice,
+      platformFees: sale.platformFees,
+      shippingCost: sale.shippingCost,
+    });
+    setSaleToast({
+      itemId: sellItem.id,
+      previousStatus: sellItem.status === "DRAFT" ? "DRAFT" : "LISTED",
+      message: `Marked as sold · ${currencyFormatter.format(sale.soldPrice)} · profit ${currencyFormatter.format(profit ?? 0)}`,
+    });
+    setSellItem(null);
+    router.refresh();
+  }
+
+  async function undoSale(): Promise<void> {
+    if (saleToast === null || isUndoing) return;
+
+    setIsUndoing(true);
+    try {
+      const response = await fetch(`/api/items/${saleToast.itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "set_status",
+          data: { status: saleToast.previousStatus },
+        }),
+      });
+
+      if (!response.ok) {
+        setSaleToast({
+          ...saleToast,
+          message: await readResponseError(response),
+          tone: "error",
+        });
+        return;
+      }
+
+      setSaleToast(null);
+      router.refresh();
+    } catch {
+      setSaleToast({
+        ...saleToast,
+        message:
+          "Could not reach the item service. The sale was not undone; try again.",
+        tone: "error",
+      });
+    } finally {
+      setIsUndoing(false);
+    }
+  }
+
   return (
-    <section className="overflow-hidden rounded-xl border border-black/15 bg-black/[.02] dark:border-white/20 dark:bg-white/[.02]">
+    <>
+      <section className="overflow-hidden rounded-xl border border-black/15 bg-black/[.02] dark:border-white/20 dark:bg-white/[.02]">
       <div className="flex items-center justify-between gap-4 border-b border-black/10 px-5 py-4.5 dark:border-white/15">
         <div>
           <h2 className="text-base font-semibold">Listings</h2>
@@ -114,52 +210,87 @@ export default function DashboardListings({
         ))}
       </div>
 
-      {summary.recent.map((item: ItemDto) => {
+      {summary.recent.map((item: ItemDto, index: number) => {
         const photo = item.photos[0];
         const status = STATUS_STYLES[item.status];
 
         return (
-          <Link
+          <div
             key={item.id}
-            href={`/listings/${item.id}`}
-            className="flex items-center gap-3.5 border-b border-black/[.06] px-5 py-3 last:border-b-0 hover:bg-black/[.03] dark:border-white/10 dark:hover:bg-white/[.04]"
+            className="flex items-center gap-2 border-b border-black/[.06] pr-5 last:border-b-0 hover:bg-black/[.03] dark:border-white/10 dark:hover:bg-white/[.04]"
           >
-            {photo ? (
-              <>
-                {/* alt="" on purpose: the title beside it already names the row, so describing the
-                    photo again would only add duplicate noise for screen readers. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+            <Link
+              href={`/listings/${item.id}`}
+              className="flex min-w-0 flex-1 items-center gap-3.5 py-3 pl-5"
+            >
+              {photo ? (
+                <Image
                   src={photo}
                   alt=""
+                  width={48}
+                  height={48}
+                  sizes="48px"
+                  loading={index === 0 ? "eager" : "lazy"}
                   className="size-12 shrink-0 rounded-lg object-cover"
                 />
-              </>
-            ) : (
-              <div className="size-12 shrink-0 rounded-lg bg-black/[.04] dark:bg-white/[.06]" />
+              ) : (
+                <div className="size-12 shrink-0 rounded-lg bg-black/[.04] dark:bg-white/[.06]" />
+              )}
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{item.title}</p>
+                {/* Truncated like the title: unwrapped, this line runs to four rows on a
+                    phone and pushes the badge and price out of alignment. */}
+                <p className="mt-0.5 truncate text-xs text-black/60 dark:text-white/60">
+                  {buildMetaLine(item, now)}
+                </p>
+              </div>
+
+              <span
+                className={`hidden shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline ${status.className}`}
+              >
+                {status.label}
+              </span>
+
+              <span className="hidden w-18 shrink-0 text-right text-sm font-semibold sm:block">
+                {currencyFormatter.format(item.listPrice)}
+              </span>
+            </Link>
+
+            {item.status !== "SOLD" && (
+              <button
+                type="button"
+                onClick={() => setSellItem(item)}
+                aria-label={`Mark ${item.title} as sold`}
+                className="min-h-11 shrink-0 rounded-md bg-foreground px-3 text-xs font-semibold text-background"
+              >
+                <span className="sm:hidden">Sell</span>
+                <span className="hidden sm:inline">Mark sold</span>
+              </button>
             )}
-
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{item.title}</p>
-              {/* Truncated like the title: unwrapped, this line runs to four rows on a
-                  phone and pushes the badge and price out of alignment. */}
-              <p className="mt-0.5 truncate text-xs text-black/60 dark:text-white/60">
-                {buildMetaLine(item, now)}
-              </p>
-            </div>
-
-            <span
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${status.className}`}
-            >
-              {status.label}
-            </span>
-
-            <span className="w-18 shrink-0 text-right text-sm font-semibold">
-              {currencyFormatter.format(item.listPrice)}
-            </span>
-          </Link>
+          </div>
         );
       })}
-    </section>
+
+      </section>
+
+      <MarkSoldDialog
+        item={sellItem}
+        onClose={() => setSellItem(null)}
+        onSold={handleSold}
+      />
+
+      {saleToast !== null && (
+        <UndoToast
+          message={saleToast.message}
+          onUndo={
+            saleToast.tone === "error" ? undefined : () => void undoSale()
+          }
+          onDismiss={() => setSaleToast(null)}
+          isUndoing={isUndoing}
+          tone={saleToast.tone}
+        />
+      )}
+    </>
   );
 }

@@ -13,6 +13,7 @@ import type { MarkSoldInput } from "@/lib/item-schema";
 type ToastState = {
   message: string;
   tone?: "default" | "error";
+  previousStatus?: "DRAFT" | "LISTED";
 };
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -64,15 +65,17 @@ export function ItemSaleController({ item }: { item: ItemDto }) {
       soldPrice: sale.soldPrice,
       purchasePrice: item.purchasePrice,
       platformFees: sale.platformFees,
+      shippingCost: sale.shippingCost,
     });
 
     setToast({
       message: `Marked as sold · ${currencyFormatter.format(sale.soldPrice)} · profit ${currencyFormatter.format(profit ?? 0)}`,
+      previousStatus: item.status === "DRAFT" ? "DRAFT" : "LISTED",
     });
   }
 
   async function handleUndo(): Promise<void> {
-    if (isUndoing) return;
+    if (isUndoing || toast === null) return;
 
     setIsUndoing(true);
 
@@ -82,7 +85,9 @@ export function ItemSaleController({ item }: { item: ItemDto }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "set_status",
-          data: { status: "LISTED" },
+          data: {
+            status: toast.previousStatus ?? "LISTED",
+          },
         }),
       });
 

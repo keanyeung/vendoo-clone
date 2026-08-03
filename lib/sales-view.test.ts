@@ -38,6 +38,8 @@ function makeItem(overrides: Partial<ItemDto> = {}): ItemDto {
     soldPlatform: "EBAY",
     soldDate: "2026-07-15T00:00:00.000Z",
     platformFees: 10,
+    shippingCost: null,
+    postings: [],
     ...overrides,
   };
 }
@@ -70,6 +72,7 @@ describe("buildSalesView", () => {
       revenue: 100,
       cost: 40,
       fees: 10,
+      shipping: 0,
       profit: 50,
       count: 1,
     });
@@ -77,6 +80,7 @@ describe("buildSalesView", () => {
       revenue: 80,
       cost: 20,
       fees: 5,
+      shipping: 0,
       profit: 55,
       count: 1,
     });
@@ -143,6 +147,7 @@ describe("buildSalesView", () => {
       revenue: 0,
       cost: 0,
       fees: 0,
+      shipping: 0,
       profit: 0,
       count: 0,
       avgProfit: null,
