@@ -25,7 +25,7 @@ export const AnalysisSchema = z.object({
   description: z
     .string()
     .describe(
-      "Concise buyer-facing listing description of exactly 2 short sentences and no more than 35 words total. In the first sentence, identify the item and its most notable visible features. In the second sentence, briefly and honestly summarize its condition. Do not invent details that are not visible in the photos. Plain text only, no markdown.",
+      "Concise buyer-facing listing description of exactly 2 short sentences and no more than 35 words total. In the first sentence, identify the item, its brand, and its most notable visible features. In the second sentence, add further detail a buyer would care about, such as material, fit, cut, styling, era, or how it wears. Do not mention condition, wear, flaws, or price — condition is shown on its own line and in condition_notes. Do not invent details that are not visible in the photos. Plain text only, no markdown.",
     ),
   brand: z
     .string()
