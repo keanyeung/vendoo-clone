@@ -4,6 +4,7 @@ import {
   buildCreateItemInput,
   buildDraftItemInput,
   createEmptyItemDraft,
+  createItemDraft,
   mergeAnalysisIntoEmptyFields,
   restorePersistedDraft,
   type ItemDraft,
@@ -86,6 +87,21 @@ describe("create item photo order", () => {
       );
       expect(parsed.success).toBe(false);
     }
+  });
+});
+
+describe("new listing condition default", () => {
+  it("starts a manual draft at excellent", () => {
+    expect(createEmptyItemDraft([photoUrl(1)]).condition).toBe("excellent");
+  });
+
+  it("starts an analysed draft at excellent and keeps the AI reading", () => {
+    const draft = createItemDraft(analysis, [photoUrl(1)]);
+
+    expect(analysis.condition).toBe("good");
+    expect(draft.condition).toBe("excellent");
+    expect(draft.aiCondition).toBe("good");
+    expect(draft.conditionNotes).toBe("Light wear is visible.");
   });
 });
 

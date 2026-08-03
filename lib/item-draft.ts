@@ -85,7 +85,10 @@ export function createItemDraft(
     category: analysis.category,
     size: analysis.size ?? "",
     color: analysis.color ?? "",
-    condition: analysis.condition,
+    // Every new listing starts at excellent and the seller downgrades it if
+    // needed. The analysis reading is kept in aiCondition so the form can show
+    // "AI read this as ..." whenever the photos suggest something lower.
+    condition: "excellent",
     aiCondition: analysis.condition,
     conditionNotes: analysis.condition_notes,
     suggestedPrice: analysis.suggested_price,
@@ -179,7 +182,7 @@ export function createEmptyItemDraft(photoUrls: string[]): ItemDraft {
     category: "",
     size: "",
     color: "",
-    condition: "good",
+    condition: "excellent",
     aiCondition: null,
     conditionNotes: "",
     suggestedPrice: null,
