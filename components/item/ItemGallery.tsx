@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
+
+import { DownloadPhotosButton } from "@/components/item/DownloadPhotosButton";
 import {
   type KeyboardEvent,
   useEffect,
@@ -148,17 +150,20 @@ export function ItemGallery({
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between gap-3 text-xs text-black/60 dark:text-white/60">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 text-xs text-black/60 dark:text-white/60">
         <p>
           {photos.length} {photos.length === 1 ? "photo" : "photos"} · created{" "}
           {createdLabel}
         </p>
-        <Link
-          href={`/listings/${itemId}/edit#photos`}
-          className="inline-flex min-h-11 shrink-0 items-center font-medium hover:text-black dark:hover:text-white"
-        >
-          Edit photos
-        </Link>
+        <div className="flex shrink-0 items-center gap-4">
+          <DownloadPhotosButton title={title} photoUrls={photos} />
+          <Link
+            href={`/listings/${itemId}/edit#photos`}
+            className="inline-flex min-h-11 shrink-0 items-center font-medium hover:text-black dark:hover:text-white"
+          >
+            Edit photos
+          </Link>
+        </div>
       </div>
 
       <dialog
