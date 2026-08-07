@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { DownloadPhotosButton } from "@/components/item/DownloadPhotosButton";
+import { PhotoDownloadButton } from "@/components/item/PhotoDownloadButton";
+import { photoFileName } from "@/lib/photo-archive";
 import {
   type KeyboardEvent,
   useEffect,
@@ -28,6 +30,8 @@ export function ItemGallery({
   const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
+  // One shared message, so a failure on any photo button reports in one place.
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const activeIndex = Math.min(
     selectedIndex,
     Math.max(photos.length - 1, 0),
@@ -97,21 +101,30 @@ export function ItemGallery({
 
   return (
     <section className="min-[1044px]:sticky min-[1044px]:top-[132px]">
-      <button
-        type="button"
-        onClick={() => setIsLightboxOpen(true)}
-        aria-label={`Open ${title}, photo ${activeIndex + 1} of ${photos.length} in full screen`}
-        className="relative block aspect-square min-h-11 w-full overflow-hidden rounded-[14px] border border-black/15 bg-black/[.03] focus-visible:outline-2 focus-visible:outline-offset-2 dark:border-white/20 dark:bg-white/[.04]"
-      >
-        <Image
-          src={activePhoto}
-          alt={title}
-          fill
-          sizes="(max-width: 1043px) calc(100vw - 2rem), 440px"
-          loading="eager"
-          className="object-cover"
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setIsLightboxOpen(true)}
+          aria-label={`Open ${title}, photo ${activeIndex + 1} of ${photos.length} in full screen`}
+          className="relative block aspect-square min-h-11 w-full overflow-hidden rounded-[14px] border border-black/15 bg-black/[.03] focus-visible:outline-2 focus-visible:outline-offset-2 dark:border-white/20 dark:bg-white/[.04]"
+        >
+          <Image
+            src={activePhoto}
+            alt={title}
+            fill
+            sizes="(max-width: 1043px) calc(100vw - 2rem), 440px"
+            loading="eager"
+            className="object-cover"
+          />
+        </button>
+        <PhotoDownloadButton
+          url={activePhoto}
+          filename={photoFileName(title, activePhoto, activeIndex, photos.length)}
+          label={`Download photo ${activeIndex + 1} of ${photos.length}`}
+          onError={setDownloadError}
+          className="absolute right-2 top-2"
         />
-      </button>
+      </div>
 
       {photos.length > 1 && (
         <div
@@ -122,29 +135,37 @@ export function ItemGallery({
             const isActive = index === activeIndex;
 
             return (
-              <button
-                key={`${photoUrl}-${index}`}
-                ref={(element) => {
-                  thumbnailRefs.current[index] = element;
-                }}
-                type="button"
-                onClick={() => setSelectedIndex(index)}
-                aria-label={`Show ${title}, photo ${index + 1}`}
-                aria-current={isActive ? "true" : undefined}
-                className={`relative aspect-square min-h-11 overflow-hidden rounded-lg transition-opacity focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                  isActive
-                    ? "border-2 border-foreground opacity-100"
-                    : "border border-black/15 opacity-65 hover:opacity-100 dark:border-white/20"
-                }`}
-              >
-                <Image
-                  src={photoUrl}
-                  alt={`${title}, photo ${index + 1}`}
-                  fill
-                  sizes="(max-width: 479px) calc((100vw - 3.875rem) / 4), 100px"
-                  className="object-cover"
+              <div key={`${photoUrl}-${index}`} className="relative">
+                <button
+                  ref={(element) => {
+                    thumbnailRefs.current[index] = element;
+                  }}
+                  type="button"
+                  onClick={() => setSelectedIndex(index)}
+                  aria-label={`Show ${title}, photo ${index + 1}`}
+                  aria-current={isActive ? "true" : undefined}
+                  className={`relative block aspect-square min-h-11 w-full overflow-hidden rounded-lg transition-opacity focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                    isActive
+                      ? "border-2 border-foreground opacity-100"
+                      : "border border-black/15 opacity-65 hover:opacity-100 dark:border-white/20"
+                  }`}
+                >
+                  <Image
+                    src={photoUrl}
+                    alt={`${title}, photo ${index + 1}`}
+                    fill
+                    sizes="(max-width: 479px) calc((100vw - 3.875rem) / 4), 100px"
+                    className="object-cover"
+                  />
+                </button>
+                <PhotoDownloadButton
+                  url={photoUrl}
+                  filename={photoFileName(title, photoUrl, index, photos.length)}
+                  label={`Download photo ${index + 1} of ${photos.length}`}
+                  onError={setDownloadError}
+                  className="absolute right-1 top-1"
                 />
-              </button>
+              </div>
             );
           })}
         </div>
@@ -165,6 +186,15 @@ export function ItemGallery({
           </Link>
         </div>
       </div>
+
+      {downloadError !== null && (
+        <p
+          role="alert"
+          className="mt-1 text-xs text-red-700 dark:text-red-400"
+        >
+          {downloadError}
+        </p>
+      )}
 
       <dialog
         ref={dialogRef}
@@ -191,13 +221,26 @@ export function ItemGallery({
           <p className="text-sm text-black/60 dark:text-white/60">
             Photo {activeIndex + 1} of {photos.length}
           </p>
-          <button
-            type="button"
-            onClick={closeLightbox}
-            className="min-h-11 rounded-md border border-black/15 px-4 text-sm font-medium hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            <PhotoDownloadButton
+              url={activePhoto}
+              filename={photoFileName(
+                title,
+                activePhoto,
+                activeIndex,
+                photos.length,
+              )}
+              label={`Download photo ${activeIndex + 1} of ${photos.length}`}
+              onError={setDownloadError}
+            />
+            <button
+              type="button"
+              onClick={closeLightbox}
+              className="min-h-11 rounded-md border border-black/15 px-4 text-sm font-medium hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
+            >
+              Close
+            </button>
+          </div>
         </div>
         <div className="relative mt-3 h-[calc(100dvh-8rem)] min-h-64 max-h-[85vh] w-full">
           <Image

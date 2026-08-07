@@ -6,6 +6,7 @@ import {
   FALLBACK_ARCHIVE_NAME,
   photoEntryName,
   photoExtension,
+  photoFileName,
 } from "./photo-archive";
 
 const MODIFIED_AT = new Date(2026, 7, 3, 14, 30, 20);
@@ -83,6 +84,29 @@ describe("photoEntryName", () => {
   it("zero-pads so file browsers sort the photos in listing order", () => {
     expect(photoEntryName(photoUrl("a.jpg"), 0, 12)).toBe("01-cover.jpg");
     expect(photoEntryName(photoUrl("j.jpg"), 9, 12)).toBe("10.jpg");
+  });
+});
+
+describe("photoFileName", () => {
+  it("carries the listing name, since a lone photo has no folder", () => {
+    expect(photoFileName("Patagonia fleece", photoUrl("a.jpg"), 0, 3)).toBe(
+      "Patagonia fleece 1-cover.jpg",
+    );
+    expect(photoFileName("Patagonia fleece", photoUrl("b.png"), 1, 3)).toBe(
+      "Patagonia fleece 2.png",
+    );
+  });
+
+  it("sanitises the title the same way the folder name is sanitised", () => {
+    expect(photoFileName("Levi's 501 <32/34>", photoUrl("a.jpg"), 1, 2)).toBe(
+      "Levi's 501 32 34 2.jpg",
+    );
+  });
+
+  it("falls back for an untitled listing", () => {
+    expect(photoFileName("", photoUrl("a.jpg"), 0, 1)).toBe(
+      `${FALLBACK_ARCHIVE_NAME} 1-cover.jpg`,
+    );
   });
 });
 

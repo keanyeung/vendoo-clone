@@ -3,32 +3,13 @@
 import { useState } from "react";
 
 import { buildPhotoArchive } from "@/lib/photo-archive";
+import { fetchPhotoBytes, saveBlob } from "@/lib/photo-download";
 
 type DownloadPhotosButtonProps = {
   title: string;
   photoUrls: string[];
   className?: string;
 };
-
-async function fetchPhoto(url: string): Promise<Uint8Array<ArrayBuffer>> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Photo request failed with ${response.status}`);
-  }
-  return new Uint8Array(await response.arrayBuffer());
-}
-
-function saveZip(filename: string, bytes: Uint8Array<ArrayBuffer>): void {
-  const blob = new Blob([bytes], { type: "application/zip" });
-  const href = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = href;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(href);
-}
 
 export function DownloadPhotosButton({
   title,
@@ -47,11 +28,14 @@ export function DownloadPhotosButton({
       const photos = await Promise.all(
         photoUrls.map(async (url: string) => ({
           url,
-          data: await fetchPhoto(url),
+          data: await fetchPhotoBytes(url),
         })),
       );
       const archive = buildPhotoArchive(title, photos, new Date());
-      saveZip(archive.filename, archive.bytes);
+      saveBlob(
+        archive.filename,
+        new Blob([archive.bytes], { type: "application/zip" }),
+      );
     } catch {
       setError("Could not download the photos. Check your connection and retry.");
     } finally {

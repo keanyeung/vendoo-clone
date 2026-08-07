@@ -92,6 +92,20 @@ export function photoEntryName(
   return `${position}${suffix}.${photoExtension(url)}`;
 }
 
+/**
+ * Filename for a photo saved on its own. The listing name is carried in the
+ * filename because a single photo lands loose in the downloads folder, with no
+ * enclosing folder to say which listing it came from.
+ */
+export function photoFileName(
+  title: string,
+  url: string,
+  index: number,
+  total: number,
+): string {
+  return `${archiveFolderName(title)} ${photoEntryName(url, index, total)}`;
+}
+
 export type PhotoArchive = {
   filename: string;
   bytes: Uint8Array<ArrayBuffer>;
