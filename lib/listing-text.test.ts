@@ -46,6 +46,32 @@ function makeItem(overrides: Partial<ItemDto> = {}): ItemDto {
 
 describe("formatListingText", () => {
   it.each(LISTING_PLATFORMS)(
+    "keeps condition out of the %s listing body",
+    (platform: ListingPlatform) => {
+      const text = formatListingText(
+        makeItem({
+          condition: "good",
+          conditionNotes: "Light pilling on the cuffs.",
+        }),
+        platform,
+      );
+
+      expect(text).not.toMatch(/condition/i);
+      expect(text).not.toMatch(/flaw/i);
+      expect(text).not.toContain("Light pilling on the cuffs.");
+    },
+  );
+
+  it.each(LISTING_PLATFORMS)(
+    "still lists size on %s, which is not condition",
+    (platform: ListingPlatform) => {
+      expect(formatListingText(makeItem({ size: "M" }), platform)).toContain(
+        "Size: M",
+      );
+    },
+  );
+
+  it.each(LISTING_PLATFORMS)(
     "uses description as the $platform listing body",
     (platform: ListingPlatform) => {
       const text = formatListingText(makeItem(), platform);

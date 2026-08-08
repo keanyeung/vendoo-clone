@@ -20,12 +20,12 @@ export const AnalysisSchema = z.object({
   summary: z
     .string()
     .describe(
-      "One concise sentence (under ~20 words) summarizing the item for a marketplace listing: what it is, the brand, and one or two standout attributes. Do not include price, condition, or size — those are shown on their own lines. Plain text, exactly one sentence.",
+      "One concise sentence (under ~20 words) summarizing the item for a marketplace listing: what it is, the brand, and one or two standout attributes. Do not include price, condition, or size — size has its own line, and price and condition are handled in their own fields. Plain text, exactly one sentence.",
     ),
   description: z
     .string()
     .describe(
-      "Concise buyer-facing listing description of exactly 2 short sentences and no more than 35 words total. In the first sentence, identify the item, its brand, and its most notable visible features. In the second sentence, add further detail a buyer would care about, such as material, fit, cut, styling, era, or how it wears. Do not mention condition, wear, flaws, or price — condition is shown on its own line and in condition_notes. Do not invent details that are not visible in the photos. Plain text only, no markdown.",
+      "Concise buyer-facing listing description of exactly 2 short sentences and no more than 35 words total. In the first sentence, identify the item, its brand, and its most notable visible features. In the second sentence, add further detail a buyer would care about, such as material, fit, cut, styling, era, or how it wears. Do not mention condition, wear, flaws, or price — condition is recorded separately in the condition and condition_notes fields, and never appears in the pasted listing text. Do not invent details that are not visible in the photos. Plain text only, no markdown.",
     ),
   brand: z
     .string()
