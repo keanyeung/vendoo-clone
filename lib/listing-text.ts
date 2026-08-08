@@ -6,6 +6,18 @@ export type ListingPlatform = "FB_MARKETPLACE" | "DEPOP" | "EBAY";
 export const FB_PICKUP_DETAILS =
   "E-transfer or cash accepted, pickup in North Haven or meetups in NW Calgary";
 
+const CONDITION_PHRASES: Record<string, string> = {
+  new_with_tags: "New with tags",
+  excellent: "Excellent condition",
+  good: "Good condition",
+  fair: "Fair condition",
+  poor: "Poor condition",
+};
+
+// Whether a condition tier is presented as flawless. Everything with real wear
+// (good/fair/poor) is disclosed as having minor flaws for buyer honesty.
+const NO_FLAW_CONDITIONS = new Set<string>(["new_with_tags", "excellent"]);
+
 export const PLATFORM_LABELS = {
   FB_MARKETPLACE: "Facebook",
   DEPOP: "Depop",
@@ -52,6 +64,17 @@ function hasValue(value: string | null): value is string {
   return value !== null && value.trim().length > 0;
 }
 
+// The condition line, e.g. "Good condition, minor flaws". Null when the item's
+// condition is missing or unrecognized (then the line is skipped).
+function conditionLine(item: ItemDto): string | null {
+  const phrase = CONDITION_PHRASES[item.condition ?? ""];
+  if (phrase === undefined) return null;
+  const flaws = NO_FLAW_CONDITIONS.has(item.condition ?? "")
+    ? "no flaws"
+    : "minor flaws";
+  return `${phrase}, ${flaws}`;
+}
+
 // Depop-style hashtags built from the item's keywords: lowercased, stripped to
 // alphanumerics, de-duplicated, and capped at five.
 function depopHashtags(item: ItemDto): string {
@@ -74,11 +97,12 @@ export function getListingBody(
   return hasValue(item.summary) ? item.summary.trim() : "";
 }
 
-// Every platform shares one listing body, then a details block (size when
-// known), plus optional platform extras. The title is intentionally excluded
-// because it is copied on its own; price is excluded because each platform has
-// its own price field. Condition is deliberately absent from the pasted text -
-// the marketplaces collect it in their own field.
+// Every platform shares one listing body, then a details block (size, then
+// condition), plus optional platform extras. The title is intentionally
+// excluded because it is copied on its own; price is excluded because each
+// platform has its own price field. Condition appears here as its own bullet
+// rather than inside the description prose, so it reads as a stated fact
+// alongside size and the payment terms.
 function formatMarketplace(
   item: ItemDto,
   options: { pickup?: boolean; hashtags?: boolean } = {},
@@ -87,6 +111,8 @@ function formatMarketplace(
 
   const detailLines: string[] = [];
   if (hasValue(item.size)) detailLines.push(`Size: ${item.size}`);
+  const condition = conditionLine(item);
+  if (condition !== null) detailLines.push(condition);
   if (options.pickup) detailLines.push(FB_PICKUP_DETAILS);
 
   const blocks: string[] = [listingBody, detailLines.join("\n")];

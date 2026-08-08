@@ -46,28 +46,56 @@ function makeItem(overrides: Partial<ItemDto> = {}): ItemDto {
 
 describe("formatListingText", () => {
   it.each(LISTING_PLATFORMS)(
-    "keeps condition out of the %s listing body",
+    "lists condition as its own detail line on %s",
     (platform: ListingPlatform) => {
       const text = formatListingText(
-        makeItem({
-          condition: "good",
-          conditionNotes: "Light pilling on the cuffs.",
-        }),
+        makeItem({ condition: "excellent", size: "Women's XL" }),
         platform,
       );
 
-      expect(text).not.toMatch(/condition/i);
-      expect(text).not.toMatch(/flaw/i);
-      expect(text).not.toContain("Light pilling on the cuffs.");
+      expect(text).toContain("Excellent condition, no flaws");
     },
   );
 
+  it("orders the detail lines size, condition, then payment terms", () => {
+    const text = formatListingText(
+      makeItem({ condition: "excellent", size: "Women's XL" }),
+      "FB_MARKETPLACE",
+    );
+
+    expect(text).toContain(
+      `Size: Women's XL\nExcellent condition, no flaws\n${FB_PICKUP_DETAILS}`,
+    );
+  });
+
+  it.each([
+    ["new_with_tags", "New with tags, no flaws"],
+    ["excellent", "Excellent condition, no flaws"],
+    ["good", "Good condition, minor flaws"],
+    ["fair", "Fair condition, minor flaws"],
+    ["poor", "Poor condition, minor flaws"],
+  ] as const)("renders %s as %s", (condition, expected) => {
+    expect(formatListingText(makeItem({ condition }), "EBAY")).toContain(
+      expected,
+    );
+  });
+
+  it("skips the condition line when the item has no condition", () => {
+    const text = formatListingText(makeItem({ condition: null }), "EBAY");
+
+    expect(text).not.toMatch(/condition/i);
+    expect(text).toContain("Size: M");
+  });
+
   it.each(LISTING_PLATFORMS)(
-    "still lists size on %s, which is not condition",
+    "keeps the free-text condition notes out of %s",
     (platform: ListingPlatform) => {
-      expect(formatListingText(makeItem({ size: "M" }), platform)).toContain(
-        "Size: M",
+      const text = formatListingText(
+        makeItem({ conditionNotes: "Light pilling on the cuffs." }),
+        platform,
       );
+
+      expect(text).not.toContain("Light pilling on the cuffs.");
     },
   );
 
