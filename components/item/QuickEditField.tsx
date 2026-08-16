@@ -12,8 +12,13 @@ import { useItemDetail } from "@/components/item/ItemDetailProvider";
 import { ITEM_TITLE_MAX_LENGTH } from "@/lib/item-schema";
 import { formatPrice } from "@/lib/listing-text";
 
-type EditableField = "title" | "listPrice";
+type EditableField = "title" | "listPrice" | "purchasePrice";
 type SaveState = "idle" | "saving" | "saved";
+
+// A purchase price of 0 is meaningful — a free or gifted item still gets listed.
+function isPriceField(field: EditableField): boolean {
+  return field === "listPrice" || field === "purchasePrice";
+}
 
 type QuickEditFieldProps = {
   field: EditableField;
@@ -29,11 +34,12 @@ function valueAsText(value: string | number): string {
 }
 
 function displayValue(field: EditableField, value: string | number): string {
-  return field === "listPrice" ? formatPrice(value as number) : String(value);
+  return isPriceField(field) ? formatPrice(value as number) : String(value);
 }
 
 function validateDraft(
   field: EditableField,
+  label: string,
   draft: string,
 ): { value: string | number } | { error: string } {
   if (field === "title") {
@@ -47,12 +53,17 @@ function validateDraft(
     return { value: title };
   }
 
+  const allowsZero = field === "purchasePrice";
+  if (draft.trim().length === 0) return { error: `${label} is required.` };
+
   const price = Number(draft);
-  if (!Number.isFinite(price) || price <= 0) {
-    return { error: "List price must be greater than 0." };
+  if (!Number.isFinite(price) || price < 0 || (price === 0 && !allowsZero)) {
+    return {
+      error: `${label} must be ${allowsZero ? "0 or more" : "greater than 0"}.`,
+    };
   }
   if (Math.round(price * 100) / 100 !== price) {
-    return { error: "List price can have at most 2 decimal places." };
+    return { error: `${label} can have at most 2 decimal places.` };
   }
   return { value: price };
 }
@@ -125,7 +136,7 @@ export default function QuickEditField({
       return;
     }
 
-    const parsed = validateDraft(field, draft);
+    const parsed = validateDraft(field, label, draft);
     if ("error" in parsed) {
       setError(parsed.error);
       requestAnimationFrame(() => inputRef.current?.focus());
@@ -193,17 +204,23 @@ export default function QuickEditField({
       <Container className={containerClassName}>
         {isEditing ? (
           <span className="flex min-h-11 items-center">
-            {field === "listPrice" && (
+            {isPriceField(field) && (
               <span aria-hidden="true" className="text-xl font-semibold">
                 $
               </span>
             )}
             <input
               ref={inputRef}
-              type={field === "listPrice" ? "number" : "text"}
-              inputMode={field === "listPrice" ? "decimal" : undefined}
-              min={field === "listPrice" ? "0.01" : undefined}
-              step={field === "listPrice" ? "0.01" : undefined}
+              type={isPriceField(field) ? "number" : "text"}
+              inputMode={isPriceField(field) ? "decimal" : undefined}
+              min={
+                field === "listPrice"
+                  ? "0.01"
+                  : field === "purchasePrice"
+                    ? "0"
+                    : undefined
+              }
+              step={isPriceField(field) ? "0.01" : undefined}
               maxLength={field === "title" ? ITEM_TITLE_MAX_LENGTH : undefined}
               value={draft}
               onChange={(event) => {

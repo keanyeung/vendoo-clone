@@ -289,25 +289,26 @@ describe("ItemMutationSchema", () => {
     expect("suggestedPrice" in ordinaryUpdate.data.data).toBe(false);
   });
 
-  it("accepts only validated title and list-price quick edits", () => {
-    expect(
-      ItemMutationSchema.safeParse({
-        action: "patch_fields",
-        data: { title: "Updated title" },
-      }).success,
-    ).toBe(true);
-    expect(
-      ItemMutationSchema.safeParse({
-        action: "patch_fields",
-        data: { listPrice: 42.5 },
-      }).success,
-    ).toBe(true);
+  it("accepts only validated title and price quick edits", () => {
+    for (const data of [
+      { title: "Updated title" },
+      { listPrice: 42.5 },
+      { purchasePrice: 12.5 },
+      // A free or gifted item is a real purchase price of zero.
+      { purchasePrice: 0 },
+    ]) {
+      expect(
+        ItemMutationSchema.safeParse({ action: "patch_fields", data }).success,
+      ).toBe(true);
+    }
 
     for (const data of [
       {},
       { title: "" },
       { listPrice: 0 },
       { listPrice: 12.345 },
+      { purchasePrice: -1 },
+      { purchasePrice: 12.345 },
       { notes: "Not quick editable" },
     ]) {
       expect(

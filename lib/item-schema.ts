@@ -185,12 +185,15 @@ export const PatchItemFieldsSchema = z
   .object({
     title: UpdateItemSchema.shape.title.optional(),
     listPrice: UpdateItemSchema.shape.listPrice.optional(),
+    purchasePrice: UpdateItemSchema.shape.purchasePrice.optional(),
   })
   .strict()
   .refine(
     (fields): boolean =>
-      fields.title !== undefined || fields.listPrice !== undefined,
-    { message: "Provide a title or list price to update." },
+      fields.title !== undefined ||
+      fields.listPrice !== undefined ||
+      fields.purchasePrice !== undefined,
+    { message: "Provide a title, list price, or purchase price to update." },
   );
 
 export const ApplyAnalysisSchema = UpdateItemSchema.extend({

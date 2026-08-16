@@ -57,9 +57,14 @@ export function PricePanel() {
           <dt className="text-sm text-black/60 dark:text-white/60">
             You paid
           </dt>
-          <dd className="mt-1 text-[30px] font-semibold tracking-tight text-black/60 dark:text-white/60">
-            {formatPrice(item.purchasePrice)}
-          </dd>
+          <QuickEditField
+            field="purchasePrice"
+            label="Purchase price"
+            as="dd"
+            containerClassName="mt-1"
+            valueClassName="text-[30px] font-semibold tracking-tight text-black/60 dark:text-white/60"
+            inputClassName="text-[24px] font-semibold tracking-tight"
+          />
         </div>
 
         <div className="border-l border-black/15 pl-5 dark:border-white/20">
